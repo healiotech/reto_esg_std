@@ -1,0 +1,427 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Santander Design System tokens — synced from claude.ai/design project b120775c */
+  --red-100: #fbe5e5;
+  --red-300: #f27878;
+  --red-500: #ec0000;
+  --red-600: #cc0000;
+  --red-700: #990000;
+  --red-800: #7a0000;
+  --sky-100: #deedf2;
+  --sky-300: #afd3e0;
+  --sky-500: #4fa6c4;
+  --neutral-0: #ffffff;
+  --neutral-50: #f5f5f5;
+  --neutral-100: #f0f0f0;
+  --neutral-200: #e2e2e2;
+  --neutral-300: #c2c2c2;
+  --neutral-500: #6d6d6d;
+  --neutral-700: #454545;
+  --neutral-800: #333333;
+  --neutral-900: #1a1a1a;
+  --neutral-1000: #000000;
+
+  --color-brand: var(--red-500);
+  --color-brand-hover: var(--red-600);
+  --color-brand-active: var(--red-700);
+  --color-brand-soft: var(--red-100);
+  --color-accent-sky: var(--sky-100);
+
+  --surface-page: var(--neutral-0);
+  --surface-canvas: var(--neutral-50);
+  --surface-card: var(--neutral-0);
+  --surface-inverse: var(--neutral-1000);
+  --surface-brand: var(--red-500);
+
+  --border-subtle: var(--neutral-200);
+  --border-default: var(--neutral-300);
+  --border-strong: var(--neutral-800);
+
+  --text-primary: var(--neutral-1000);
+  --text-secondary: var(--neutral-700);
+  --text-tertiary: var(--neutral-500);
+  --text-on-brand: var(--neutral-0);
+  --text-on-dark: var(--neutral-0);
+  --text-link: var(--red-500);
+  --text-link-hover: var(--red-600);
+
+  --state-success: #1e8a4c;
+  --state-warning: #b87500;
+  --state-danger: var(--red-500);
+  --state-info: var(--sky-500);
+
+  --font-sans: 'Ubuntu', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+  --tracking-wide: 0.04em;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --radius-s: 4px;
+  --radius-m: 8px;
+  --radius-l: 16px;
+  --radius-pill: 999px;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.06), 0 4px 12px rgba(0, 0, 0, 0.06);
+  --shadow-raised: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --shadow-focus: 0 0 0 3px var(--red-100);
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+
+  /* ============================================================
+     Sistema de diseño — "Santander institucional" (Dirección C)
+     La pantalla es un DOCUMENTO del banco: un anclaje de marca
+     (rojo Santander) arriba, y cada sección/subsección rotulada
+     con una franja de ENCABEZADO DE ZONA en neutro oscuro que
+     dice qué es. El rojo se reserva para (a) ese anclaje de marca
+     y (b) señalar riesgo real (bandas alto/crítico, veredicto).
+     El neutro oscuro es el color estructural por defecto.
+     Ubuntu rotula; DM Sans es cuerpo y cifras. Sin monoespaciada.
+     Global y reutilizable; hoy lo consume `.resultados-root`.
+     ============================================================ */
+
+  /* Familias — dos roles, sin monoespaciada */
+  --font-display: 'Ubuntu', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+  --font-text: 'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+  --font-figure: 'DM Sans', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+
+  /* Tinta y papel del documento — near-black #1a1a1a, no #000 puro */
+  --doc-ink-900: #1a1a1a;
+  --doc-ink-700: #454545;
+  --doc-ink-500: #6d6d6d;
+  --doc-ink-400: #6d6d6d;
+  --doc-rule: #e2e2e2;
+  --doc-rule-strong: #c2c2c2;
+  --doc-paper: #ffffff;
+  --doc-paper-sunk: #f5f5f5;
+  --doc-paper-tint: #f0f0f0;
+
+  /* Encabezados de zona — NEUTRO oscuro por defecto (los "letreros" del
+     documento). `master` es la única franja de marca, arriba del todo. */
+  --zone-bg: #1a1a1a;        /* encabezado de sección */
+  --zone-bg-sub: #333333;    /* encabezado de subsección */
+  --zone-fg: #ffffff;
+  --zone-fg-dim: rgba(255, 255, 255, 0.62);
+  --zone-master-bg: #ec0000; /* anclaje de marca — una sola vez, arriba */
+  --zone-master-fg: #ffffff;
+
+  /* Marca — SOLO el anclaje superior y detalles de encuadre institucional */
+  --brand: #ec0000;
+  --authority: #ec0000; /* alias retro-compat dentro de esta pantalla */
+
+  /* Bandas de riesgo — espejo CSS de lib/banda.ts. Hacen el color
+     semántico de NIVEL: badges, gauges, veredicto, scores alto/crítico. */
+  --risk-bajo: #00bf63;
+  --risk-medio: #ffbd59;
+  --risk-alto: #ec0100;
+  --risk-critico: #b00000;
+
+  /* Sky — acento frío para info / contexto, nunca alarma */
+  --ctx-100: #deedf2;
+  --ctx-300: #afd3e0;
+  --ctx-500: #4fa6c4;
+
+  /* Estados no-banda (cumplimiento documental, confianza del dato) */
+  --ok-fg: #1e8a4c;
+  --ok-bg: #e4f5ea;
+  --warn-fg: #b87500;
+  --warn-bg: #fbf0dd;
+  --warn-ink: #7a5300;
+
+  /* Escala de CIFRAS — DM Sans, tabular, tracking negativo, peso alto */
+  --figure-hero: clamp(2.75rem, 5.5vw, 3.75rem); /* el veredicto */
+  --figure-2xl: clamp(2.1rem, 4.5vw, 2.75rem);   /* scores de canal */
+  --figure-xl: clamp(1.75rem, 3.5vw, 2.125rem);  /* exposición, montos */
+  --figure-l: 1.5rem;      /* ratios -3.2x */
+  --figure-m: 1.125rem;    /* cifras de apoyo (aportes de tabla) */
+
+  /* Títulos */
+  --title-page: clamp(1.6rem, 3.5vw, 2.125rem);
+  --title-section: 1.5rem;
+  --title-sub: 0.8125rem;
+
+  /* Geometría — redondeo institucional suave (4px). Las franjas de
+     encabezado de zona y las barras técnicas (gauges) se quedan a 0.
+     Nota: NO redeclarar --radius-pill acá — ese token es del sistema legado
+     (999px, ver arriba) y lo usan Button/Badge/Switch/Sidebar para chips y
+     controles con forma de píldora real; una redeclaración aquí lo pisaba
+     silenciosamente a 4px en TODA la app. */
+  --radius-panel: 4px;
+  --radius-control: 4px;
+  /* Sangría horizontal única: los "letreros" de zona y el contenido que
+     rotulan comparten el mismo margen izquierdo, de arriba a abajo. */
+  --pad-x: 16px;
+
+  --doc-section-gap: 0; /* secciones contiguas: las separa su encabezado, no el aire */
+
+  /* Legacy aliases used elsewhere in the app — same values as above */
+  --santander-red: var(--red-500);
+  --santander-sky: var(--sky-100);
+  --santander-cream: #fdf0ec;
+  --banda-bajo: #2e7d32;
+  --banda-medio: #f9a825;
+  --banda-alto: #ef6c00;
+  --banda-critico: #ec0000;
+
+  color-scheme: light;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply font-body text-santander-black antialiased;
+  background: #ffffff;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: var(--santander-red);
+  color: #ffffff;
+}
+
+/* Deliberate, restrained motion: buttons and pressables get instant feedback */
+button {
+  transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1), background-color 160ms ease, border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+button:active {
+  transform: scale(0.98);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ============================================================
+   Sistema de diseño — helpers de aplicación (Dirección C)
+   Clases globales reutilizables. La raíz `.resultados-root` solo
+   fija la familia base (DM Sans) y el intercambio a Ubuntu para
+   títulos; otras pantallas añaden su propia raíz cuando toque.
+   ============================================================ */
+.resultados-root {
+  font-family: var(--font-text);
+  color: var(--doc-ink-900);
+  -webkit-font-smoothing: antialiased;
+}
+
+.resultados-root .ds-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* Foco de teclado visible y consistente. Offset negativo: el anillo va
+   por dentro, así nunca lo recorta el `overflow: clip` de los paneles. */
+.resultados-root :focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
+}
+
+/* --- Encabezado de zona: el "letrero" que señaliza cada sección --- */
+.ds-zone {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px var(--pad-x) 10px;
+  background: var(--zone-bg);
+  color: var(--zone-fg);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.8125rem;
+  line-height: 1.2;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+.ds-zone--sub {
+  background: var(--zone-bg-sub);
+  font-size: 0.6875rem;
+  letter-spacing: 0.075em;
+  padding: 7px var(--pad-x) 8px;
+}
+.ds-zone--master {
+  background: var(--zone-master-bg);
+  color: var(--zone-master-fg);
+  /* La franja de marca respeta el wordmark tal cual (mayúsculas y
+     minúsculas), sin el tracking de versalitas de los demás letreros,
+     y con más aire vertical: es el anclaje del documento. */
+  text-transform: none;
+  letter-spacing: 0.01em;
+  padding-top: 16px;
+  padding-bottom: 16px;
+}
+.ds-zone__num {
+  font-family: var(--font-text);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  letter-spacing: 0;
+  opacity: 0.5;
+}
+.ds-zone__label { min-width: 0; }
+.ds-zone__meta {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-family: var(--font-text);
+  font-weight: 500;
+  font-size: 0.6875rem;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--zone-fg-dim);
+}
+
+/* Caption descriptiva bajo un encabezado de zona */
+.ds-section-cap {
+  margin: 0 0 16px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--doc-ink-500);
+  max-width: 70ch;
+}
+
+/* Cifra protagonista: DM Sans, tabular, tracking negativo, peso alto */
+.ds-figure {
+  font-family: var(--font-figure);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+  letter-spacing: -0.02em;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Etiqueta de estructura (eyebrow / encabezado de columna) sobre claro */
+.ds-eyebrow {
+  font-family: var(--font-text);
+  font-weight: 600;
+  font-size: 0.6875rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--doc-ink-500);
+}
+
+/* Enlace interno / de acción dentro del documento: neutro y subrayado,
+   con el rojo de marca reservado para el hover (micro-acento). */
+.resultados-root .ds-link {
+  color: var(--doc-ink-900);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color var(--duration-fast) var(--ease-standard);
+}
+.resultados-root .ds-link:hover {
+  color: var(--brand);
+}
+
+/* Disclosure sobrio: <summary> como etiqueta en versalitas con chevron
+   que gira al abrir. Reutilizable (simulador, exposición). */
+.resultados-root .ds-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-text);
+  font-weight: 600;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--doc-ink-700);
+  cursor: pointer;
+  list-style: none;
+}
+.resultados-root .ds-summary::-webkit-details-marker {
+  display: none;
+}
+.resultados-root .ds-summary .ds-summary-chev {
+  transition: transform var(--duration-fast) var(--ease-standard);
+}
+.resultados-root details[open] > .ds-summary .ds-summary-chev {
+  transform: rotate(90deg);
+}
+
+/* Panel de documento: plano, con filete y redondeo suave — nunca
+   tarjeta flotante. `overflow: clip` hace que los letreros de zona y
+   las rejillas a sangre respeten el radio en las esquinas. */
+.ds-panel {
+  background: var(--doc-paper);
+  border: 1px solid var(--doc-rule);
+  border-radius: var(--radius-panel);
+  overflow: clip;
+}
+
+/* Tooltip informativo — solo CSS (sin estado). Se abre hacia arriba y
+   anclado a la izquierda del disparador para no salirse del panel
+   (que recorta con `overflow: clip`). Visible en hover y en foco de
+   teclado. `title` en el disparador sirve de respaldo. */
+.resultados-root .ds-tip-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.resultados-root .ds-tip-trigger {
+  display: inline-flex;
+  align-items: center;
+  color: var(--doc-ink-500);
+  cursor: help;
+  transition: color var(--duration-fast) var(--ease-standard);
+}
+.resultados-root .ds-tip-trigger:hover {
+  color: var(--doc-ink-900);
+}
+.resultados-root .ds-tip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  width: max-content;
+  max-width: 240px;
+  padding: 8px 10px;
+  background: var(--zone-bg);
+  color: #ffffff;
+  font-family: var(--font-text);
+  font-size: 11.5px;
+  font-weight: 400;
+  line-height: 1.45;
+  letter-spacing: 0;
+  text-transform: none;
+  text-align: left;
+  border-radius: var(--radius-control);
+  box-shadow: 0 8px 22px -8px rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--duration-fast) var(--ease-standard);
+  z-index: 30;
+  pointer-events: none;
+}
+.resultados-root .ds-tip-wrap:hover .ds-tip,
+.resultados-root .ds-tip-wrap:focus-within .ds-tip {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Entrada corta y sobria (Motion 3) — reduced-motion ya neutraliza arriba */
+@keyframes ds-rise {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.resultados-root .ds-rise {
+  animation: ds-rise var(--duration-base) var(--ease-standard) both;
+}

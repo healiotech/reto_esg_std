@@ -1,0 +1,35 @@
+UPDATE normas AS n
+SET evidencia = v.evidencia
+FROM (VALUES
+    ('Constitución Política de los Estado Unidos Méxicanos', 'No le aplica, ya que es la Ley suprema de nuestro país, bajo la cual se desprenden las disposiciones en cada materia.'),
+    ('Ley General del Equilibrio Ecológico y la Protección al Ambiente', 'autorizaciones; licencias; cédula de operación; monitoreo; auditorías; evidencias de cumplimiento de condicionantes.'),
+    ('Ley Federal de Derechos', 'Declaraciones y comprobantes de pago; cálculos de base; concesiones/permisos vinculados; conciliación de adeudos.'),
+    ('Ley de Aguas Nacionales', 'Título de concesión; REPDA; permiso de descarga; medidores; análisis de calidad; pagos; balances hídricos; cumplimiento de NOM.'),
+    ('Código Penal Federal', 'KYC/AML; monitoreo; expedientes; controles anticorrupción; denuncias; capacitación; evaluaciones ambientales en clientes.'),
+    ('Ley General para la Prevención y Gestión Integral de Residuos', 'Registro de generador; plan de manejo; manifiestos; autorizaciones de transportista/destino; bitácoras; seguros; cierre.'),
+    ('Ley Agraria', 'Certificados y RAN; actas de asamblea; convocatoria/quórum; dominio pleno cuando proceda; contratos; consulta y ocupación.'),
+    ('Organización Internacional del Trabajo', 'Políticas laborales; auditorías; nómina; edad; contratos; libertad sindical; SST; canal de quejas; remediación; due diligence.'),
+    ('Marco de Biodiversidad de Kumming-Montreal', 'Mapa de dependencias/impactos; evaluación de hábitats; trazabilidad; planes de no deforestación; métricas y divulgación.'),
+    ('Plataforma de Beijing', 'Datos desagregados; brecha salarial; representación; políticas de igualdad y acoso; productos inclusivos; metas y seguimiento.'),
+    ('Ley General de Desarrollo Forestal Sustentable', 'Títulos de autorización de Cambio de Uso de Suelo en Terrenos Forestales (CUSTF), planes de manejo forestal, coordenadas GIS de colindancia forestal y permisos de quemas controladas.'),
+    ('Ley General de Cambio Climático', 'Inventarios GEI; reportes al RENE cuando aplique; metas y plan de transición; análisis físico/transición; evidencia de adaptación.'),
+    ('Ley Federal de Responsabilidad Ambiental', 'Due diligence de suelo/agua; línea base; seguros/garantías; planes de remediación; reservas; acuerdos judiciales.'),
+    ('Ley de Desarrollo Rural Sustentable', 'Elegibilidad; padrón/registro; proyecto productivo; reglas de operación; indicadores ambientales/sociales; trazabilidad.'),
+    ('Acuerdo de París', 'Metas de descarbonización; huella financiada; planes de transición; escenarios; gobernanza; reportes y alineación de productos.'),
+    ('Convención Americana sobre Derechos Humanos', 'Evaluaciones de DDHH; consulta/participación; mecanismos de queja; privacidad; medidas de remediación; seguimiento de clientes.'),
+    ('Ley General de Asentamientos Humanos, Ordenamiento Territorial y Desarrollo Urbano', 'Certificados de zonificación y uso de suelo municipal, atlas de riesgos territoriales y compatibilidad urbanística para infraestructura agrícola (empacadoras, silos, granjas).'),
+    ('Ley General de Economía Circular', 'Plan de Economía Circular (PEC), tasa de valorización/reciclaje de plásticos de empaque/riego y porcentaje de reutilización de merma o biomasa.'),
+    ('Ley General de Sociedades Mercantiles', 'Libros de actas de asamblea, estados financieros auditados, estructura de capitalización y reportes del consejo de administración sobre riesgos operativos/climáticos.'),
+    ('Ley General de Aguas', 'Título de concesión de agua, lecturas de medidores volumétricos y análisis de calidad de descargas residuales según la NOM-001-SEMARNAT.'),
+    ('Protocolo de Kioto', 'Reportes de reducción de emisiones (tCO2e), metodología de monitoreo, reporte y verificación (MRV) de carbono en suelos y certificados de créditos de carbono (CERs/VERs).'),
+    ('Ley Federal de Sanidad Animal', 'Certificados zoosanitarios; SENASICA; trazabilidad; buenas prácticas; registros de unidades/establecimientos; planes de bioseguridad.'),
+    ('NOM - 127 - SSA 1- 2021', 'Resultados de laboratorio que demuestren que el agua cumple con los límites permisibles establecidos, así como mediante registros de monitoreo, operación y mantenimiento de los sistemas de abastecimiento y tratamiento. De igual forma, contar con autorizaciones sanitarias y resultados de verificaciones de autoridades sanitarias.'),
+    ('ISO 14001', 'Las empresas deben conservar información documentada como evidnecia de su competencia, comunicaciónes, evolación del cumplimiento legal, auditorías y acciones correctivas.'),
+    ('Ley Federal  del Trabajo', 'Se solicita que las empresas cuenten con contratos laborales, recibos de nómina, comprobantes de pago de salarios y prestaciones, altas y pagos al IMSS, un programas de capacitación, los registros de seguridad y salud ocupaciona y las actas de inspección laboral satisfactorias.'),
+    ('NOM - 001 - SEMARNAT - 2021', 'Se solicita que las empresas monitorear periódicamente la calidad de sus descargas, cumplan con los límites máximos establecidos por la NOM, implementen sistemas de tratamiento cuando sea necesario y presenten informes de resultados de muestreo a la autoridad cuando corresponda.'),
+    ('NOM  - 015 - SEMARNAT/AGRICULTURA - 2023', 'Se solicita que cuenten con un aviso de Uso del Fuego, registros y bitácoras de quemas, programas internos de prevención de incendios, evidencia de capacitación del personal, avisos a predios colindantes y calendarios de quema autorizados'),
+    ('Ley del Mercado de Valores', 'Estados financieros, informe de sustentabilidad, reportes anuales, evidencia de gobierno corporarivo, ausencias de sanciones regulatorias por la CNBV.'),
+    ('Principios de Ecuador', 'Evaluación de Impacto Ambiental y Social (EIAS), Planes de Acción Correctora (ESAP), consulta previa a comunidades indígenas y huella de carbono del proyecto.'),
+    ('NOM - 052 - SEMARNAT - 2005', 'Análisis CRIT o una manifestación basada en conocimiento cientifico o evidencia empirica de sus materiales y procesos.')
+) AS v(titulo, evidencia)
+WHERE n.titulo = v.titulo;

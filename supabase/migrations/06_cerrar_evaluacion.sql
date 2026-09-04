@@ -1,0 +1,13 @@
+-- ============================================================================
+--  cerrada_por — quién aprobó el cierre de una evaluación.
+--  Mismo criterio que `evaluador` (texto libre, sin FK a tabla de usuarios):
+--  el proyecto no tiene autenticación de analistas todavía.
+--  Ver supabase/functions/cerrar-evaluacion/index.ts.
+--
+--  Depende de 03_evaluacion_estado_completa.sql (agrega 'completa' al enum
+--  estado_evaluacion) y 04_evaluacion_resultado_snapshot.sql (agrega
+--  resultado/snapshot_parametros/calculado_en) — ambas reconcilian el
+--  esquema committeado con lo que evaluar/index.ts (v2) y esta función ya
+--  asumen que existe.
+-- ============================================================================
+alter table evaluaciones add column if not exists cerrada_por text;

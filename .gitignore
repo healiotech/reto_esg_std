@@ -1,0 +1,14 @@
+.env
+
+# OS
+.DS_Store
+
+# Node (frontend/ has its own .gitignore for node_modules/dist too)
+node_modules
+
+# Supabase CLI local project state (project ref, pooler URL, cached versions)
+supabase/.temp
+
+# Claude Code / impeccable local machine state (permissions, cached config)
+.claude/settings.local.json
+.impeccable/

@@ -1,0 +1,13 @@
+-- ============================================================================
+--  Añade 'completa' a estado_evaluacion.
+--
+--  01_esquema_riesgo.sql define estado_evaluacion como ('borrador', 'cerrada')
+--  únicamente. Pero evaluar/index.ts (v2) ya escribe estado: "completa" tras
+--  calcular y persistir el resultado — esta migración reconcilia el archivo
+--  committeado con lo que el código en producción ya asume.
+--
+--  ALTER TYPE ... ADD VALUE no puede ejecutarse dentro de la misma
+--  transacción en la que luego se usa el valor nuevo; por eso vive en su
+--  propia migración, separada de 04 (que sí usaría 'completa').
+-- ============================================================================
+alter type estado_evaluacion add value if not exists 'completa' before 'cerrada';
