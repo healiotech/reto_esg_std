@@ -1289,15 +1289,7 @@ function SimuladorFinanciero({
             </div>
           </div>
 
-          {/* 4c · Dictamen de bancabilidad — cierra la lectura de crédito, justo
-              debajo de los indicadores que resume. Solo Actual y Cumple tienen
-              estructura; en Parcial/Incumple no se renderiza y 4b→4d quedan
-              contiguos. Versión cuantificada de la antigua alerta FEGA. */}
-          {estructura && (
-            <DictamenBancabilidad estructura={estructura} plazoBase={plazoBase} esActual={esActual} />
-          )}
-
-          {/* 4d · Estados financieros — Actual vs. escenario, lado a lado. Con
+          {/* 4c · Estados financieros — Actual vs. escenario, lado a lado. Con
               la pestaña Actual (esActual) cada panel muestra una sola columna. */}
           <div className="px-4 py-4" style={{ borderTop: '1px solid var(--doc-rule)' }}>
             <div className="ds-eyebrow" style={{ fontSize: '0.625rem' }}>
@@ -1398,10 +1390,17 @@ function SimuladorFinanciero({
             </div>
           </div>
 
-          {/* 4e · Costo del crédito — la conclusión que corona el modelo:
-              traduce el riesgo ESG + capacidad de pago a la tasa que pagaría
-              el cliente. Scorecard, no cotización. */}
+          {/* 4d · Costo del crédito — traduce el riesgo ESG + capacidad de pago
+              a la tasa que pagaría el cliente. Scorecard, no cotización. */}
           <CostoDelCredito spread={spreadActivo} spreadActual={mostrada.spread.actual} spreadCumple={spreadCumple} />
+
+          {/* 4e · Decisión de crédito — el dictamen que cierra el bloque, después
+              de todo el sustento (indicadores, estados financieros, costo).
+              Solo Actual y Cumple tienen estructura; en Parcial/Incumple no se
+              renderiza. Versión cuantificada de la antigua alerta FEGA. */}
+          {estructura && (
+            <DictamenBancabilidad estructura={estructura} plazoBase={plazoBase} esActual={esActual} />
+          )}
         </div>
       </div>
     </div>
@@ -1439,8 +1438,9 @@ function TabButtonSimulador({
 }
 
 // Dictamen de bancabilidad: traduce la auto-estructuración de deuda del backend
-// (estructura_deuda) en una decisión de crédito. Encabeza el "Resultado del
-// escenario" —la conclusión primero, los indicadores como sustento debajo—.
+// (estructura_deuda) en una decisión de crédito. Cierra el "Resultado del
+// escenario" —el dictamen al final, después de todo su sustento (indicadores,
+// estados financieros, costo del crédito)—.
 // Formato compacto: eyebrow + verdicto en negrita/color semántico al inicio de
 // la razón. El ámbar del caso "reestructura" es el mismo del DSCR bajo umbral;
 // el rojo del caso FEGA es el de banda crítica. Reemplaza a la antigua alerta
