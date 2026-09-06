@@ -7,9 +7,11 @@
 //     calculado con el factor_incumplimiento REAL de cada norma. Es el ancla.
 //   · Tres escenarios de REFERENCIA (cumple/parcial/incumple): hipótesis
 //     uniformes que delimitan el espectro donde ubicar al "Actual".
-//   · CAPEX DE CUMPLIMIENTO: cumplir cuesta. Se deriva de la consecuencia
-//     ("consecuencia invertida"): CAPEX = 60% de la consecuencia esperada.
-//     Se financia 75% deuda / 25% capital, se deprecia a 10 años.
+//   · CAPEX DE CUMPLIMIENTO: cumplir cuesta. Se deriva de la consecuencia AÚN
+//     NO CUBIERTA por el cliente ("consecuencia invertida"): CAPEX = 60% de la
+//     consecuencia potencial escalada, norma por norma, por el
+//     factor_incumplimiento REAL. Cliente ya conforme → CAPEX ≈ 0 → "Cumple" ≈
+//     "Actual". Se financia 75% deuda / 25% capital, se deprecia a 10 años.
 //   · Tres estados financieros SECCIONADOS: Estado de Resultados, Balance
 //     General y Flujo de Efectivo (operativo/inversión/financiamiento).
 //
@@ -247,6 +249,12 @@ function construirVista(
 //  peso(f) = cuánto se materializa el incumplimiento de esa norma [0..1].
 //    · escenarios uniformes: peso = intensidad del escenario (igual para todas)
 //    · "actual": peso = factor_incumplimiento real de cada norma (heterogéneo)
+//
+//  El CAPEX de cumplimiento se deriva de la consecuencia AÚN NO CUBIERTA por el
+//  cliente: por norma, la consecuencia potencial escalada por su
+//  factor_incumplimiento REAL (la brecha que le falta cerrar). Un cliente ya
+//  conforme (factor_incumplimiento = 0 en todo) no tiene brecha, su CAPEX → 0 y
+//  el escenario "Cumple" converge a "Actual". No depende del peso del escenario.
 // ----------------------------------------------------------------------------
 function agregar(
   filas: FilaSimulacion[],
@@ -257,18 +265,23 @@ function agregar(
 ) {
   let impactoOperativo = 0;
   let multa = 0;
-  let consecuenciaTotal = 0; // para derivar el CAPEX de cumplimiento
+  let consecuenciaNoCubierta = 0; // base del CAPEX de cumplimiento
 
   for (const f of filas) {
     const w = peso(f);
     const coef = coefMaterialidad[f.tema] ?? 0;
     const curva = CURVA_SEVERIDAD_ISO[f.severidad] ?? 0;
 
-    // Consecuencia potencial "plena" de esta norma (operativa + multa),
-    // usada tanto para el daño (si incumple) como para derivar el CAPEX (si cumple).
+    // Consecuencia potencial "plena" de esta norma en el canal operativo.
     const opPleno = ebitdaBase * coef * curva;
+    // La multa esperada YA viene escalada por el incumplimiento real del cliente
+    // (index.ts: multa × factor_incumplimiento × prob_fisc/5); no se re-escala.
     const multaPlena = f.multa_esperada_mxn;
-    consecuenciaTotal += opPleno + multaPlena;
+
+    // Brecha de cumplimiento de ESTE cliente en ESTA norma: la fracción operativa
+    // aún incumplida (opPleno × factor_incumplimiento) más la multa esperada.
+    // Es lo que un CAPEX tendría que resolver para llevarlo a cumplimiento pleno.
+    consecuenciaNoCubierta += opPleno * f.factor_incumplimiento + multaPlena;
 
     if (!esCumple) {
       // Escenario de daño: se materializa según el peso.
@@ -277,9 +290,10 @@ function agregar(
     }
   }
 
-  // CAPEX de cumplimiento: solo en "cumple" (invierte para evitar TODA la
-  // consecuencia). Deriva de la consecuencia total: 60% de ella.
-  const capex = esCumple ? consecuenciaTotal * CAPEX_PARAMS.factor_consecuencia : 0;
+  // CAPEX de cumplimiento: solo en "cumple". 60% de la consecuencia que el
+  // cliente aún NO tiene cubierta (su brecha real), no de la consecuencia
+  // potencial plena de todas las normas.
+  const capex = esCumple ? consecuenciaNoCubierta * CAPEX_PARAMS.factor_consecuencia : 0;
 
   return { impactoOperativo, multa, capex };
 }
@@ -312,7 +326,7 @@ export function simularV2(
     origen_parametros: {
       curva_severidad: "referencia_iso",
       coef_materialidad: "supuesto",
-      capex_cumplimiento: "derivado_consecuencia_60pct",
+      capex_cumplimiento: "derivado_consecuencia_no_cubierta_60pct",
       financiamiento_capex: "supuesto_75_25",
       perfil_base: "placeholder",
       intensidad_escenario: "placeholder",

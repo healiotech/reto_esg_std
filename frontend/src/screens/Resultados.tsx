@@ -1238,7 +1238,7 @@ function SimuladorFinanciero({
               <ImpactoChip
                 label="CAPEX de cumplimiento"
                 valor={vistaActiva.capex_cumplimiento}
-                nota="Inversión estimada para regularizarse: 60% de la consecuencia total que se evitaría al cumplir (impacto operativo en EBITDA + multas). Por eso puede superar la multa: el mayor costo de incumplir suele ser la pérdida operativa, no la multa."
+                nota="Inversión estimada para cerrar la brecha de cumplimiento del cliente: 60% de la consecuencia aún no cubierta, norma por norma (impacto operativo potencial en EBITDA escalado por su incumplimiento real, más las multas esperadas). Un cliente ya conforme tiende a 0. Por eso puede superar la multa: el mayor costo de incumplir suele ser la pérdida operativa, no la multa."
                 subnota={`Flujo de inversión ${formatPesos(vistaActiva.flujo.flujo_inversion)}`}
               />
               <ImpactoChip
