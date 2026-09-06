@@ -285,7 +285,7 @@ export interface EstructuraDeuda {
 }
 
 /** Categoría del scorecard de crédito PyME FIRA. `fuera_alcance` = corporativo. */
-export type CategoriaCredito = 'A' | 'B' | 'C' | 'D' | 'fuera_alcance';
+export type CategoriaCredito = 'A' | 'B' | 'C' | 'D' | 'bursatil' | 'fuera_alcance';
 
 /**
  * Spread crediticio derivado por escenario: traduce el riesgo ESG y la

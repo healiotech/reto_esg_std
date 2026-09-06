@@ -1517,16 +1517,21 @@ function DictamenBancabilidad({
 
 // Etiqueta y color de banda por categoría del scorecard de crédito.
 // A verde, B ámbar, C rojo-naranja, D rojo (paleta de banda de riesgo).
-const CATEGORIA_CREDITO: Record<'A' | 'B' | 'C' | 'D', { label: string; hex: string }> = {
+// `bursatil` no es una categoría de riesgo: es la referencia de fondeo de un
+// emisor listado (azul de contexto, sin letra de grado).
+const CATEGORIA_CREDITO: Record<'A' | 'B' | 'C' | 'D' | 'bursatil', { label: string; hex: string }> = {
   A: { label: 'Riesgo bajo (greenium)', hex: '#1e8a4c' },
   B: { label: 'Riesgo medio (base FIRA)', hex: '#b87500' },
   C: { label: 'Riesgo alto', hex: '#ec0100' },
   D: { label: 'Riesgo crítico', hex: '#b00000' },
+  bursatil: { label: 'Referencia bursátil (quirografario)', hex: 'var(--ctx-500)' },
 };
 
 // Costo del crédito: el spread ESG traducido a "TIIE + x%". Corona el
 // simulador. Solo presentación del scorecard del backend; ninguna cifra se
-// calcula aquí. Fuera de alcance (corporativo) => solo el mensaje, sin tasa.
+// calcula aquí. `cotiza_bolsa` muestra la referencia bursátil fija (TIIE +
+// 150 pb, sin letra de grado); `multinacional` queda fuera de alcance (solo
+// el mensaje, sin tasa).
 function CostoDelCredito({
   spread,
   spreadActual,
@@ -1536,12 +1541,18 @@ function CostoDelCredito({
   spreadActual: Spread;
   spreadCumple: Spread | undefined;
 }) {
-  const notaFuente = (
-    <p className="m-0 mt-3 text-[11px] leading-relaxed" style={{ color: 'var(--doc-ink-500)' }}>
-      Scorecard de spread sobre TIIE ({spread.tiie.toFixed(2)}%). Base PyME FIRA; ajuste ESG calibrado a 200–400 pb
-      (Expansión ESG / GGGI). No es una cotización.
-    </p>
-  );
+  const notaFuente =
+    spread.categoria === 'bursatil' ? (
+      <p className="m-0 mt-3 text-[11px] leading-relaxed" style={{ color: 'var(--doc-ink-500)' }}>
+        Referencia de mercado de capitales sobre TIIE ({spread.tiie.toFixed(2)}%): deuda quirografaria de emisor
+        listado. No es el scorecard PyME FIRA ni una cotización.
+      </p>
+    ) : (
+      <p className="m-0 mt-3 text-[11px] leading-relaxed" style={{ color: 'var(--doc-ink-500)' }}>
+        Scorecard de spread sobre TIIE ({spread.tiie.toFixed(2)}%). Base PyME FIRA; ajuste ESG calibrado a 200–400 pb
+        (Expansión ESG / GGGI). No es una cotización.
+      </p>
+    );
 
   if (!spread.aplica) {
     return (
@@ -1557,7 +1568,8 @@ function CostoDelCredito({
     );
   }
 
-  const cat = CATEGORIA_CREDITO[spread.categoria as 'A' | 'B' | 'C' | 'D'];
+  const cat = CATEGORIA_CREDITO[spread.categoria as keyof typeof CATEGORIA_CREDITO];
+  const esBursatil = spread.categoria === 'bursatil';
   const spreadPct = (spread.spread_pct ?? 0).toFixed(2);
   const tasaTotal = (spread.tasa_total_pct ?? 0).toFixed(2);
 
@@ -1586,12 +1598,14 @@ function CostoDelCredito({
         </div>
         <div className="sm:pt-1">
           <span className="inline-flex items-center gap-2">
-            <span
-              className="inline-flex items-center justify-center font-bold text-[13px]"
-              style={{ width: 26, height: 26, background: `${cat.hex}1f`, color: cat.hex, borderRadius: 'var(--radius-control)' }}
-            >
-              {spread.categoria}
-            </span>
+            {!esBursatil && (
+              <span
+                className="inline-flex items-center justify-center font-bold text-[13px]"
+                style={{ width: 26, height: 26, background: `${cat.hex}1f`, color: cat.hex, borderRadius: 'var(--radius-control)' }}
+              >
+                {spread.categoria}
+              </span>
+            )}
             <span className="font-semibold text-[12px]" style={{ color: cat.hex }}>
               {cat.label}
             </span>

@@ -429,9 +429,15 @@ export function estructurarDeuda(v: ResultadoVista, perfil: PerfilFinanciero): E
 //  históricos de default para calibrarla): es un SCORECARD transparente, como el
 //  que un banco usa para PyMEs — mapea a categoría de riesgo y asigna spread.
 //
-//  ALCANCE: solo PyME y mediana (crédito FIRA). Un corporativo que cotiza se
-//  fondea vía mercado de capitales (TIIE+1.25% quirografario), no con crédito
-//  PyME FIRA — el scorecard no aplica y se marca fuera de alcance.
+//  ALCANCE: el scorecard ESG A/B/C/D es solo para PyME y mediana (crédito FIRA).
+//   · cotiza_bolsa: se fondea vía emisión bursátil, no con crédito PyME FIRA.
+//     No se corre el scorecard, pero se devuelve una referencia SIMPLE de deuda
+//     quirografaria: TIIE + 150 pb fijos (categoría "bursatil"). No la modula ni
+//     el riesgo ESG ni el DSCR (el spread bursátil lo fija el mercado de
+//     capitales; el DSCR de este simulador usa un perfil PyME agro de respaldo
+//     que no representa a un emisor listado).
+//   · multinacional: fondeo global sin referencia local comparable → fuera de
+//     alcance (aplica = false).
 //
 //  Dos ejes:
 //   1. Score ESG (banda de riesgo) → categoría A/B/C/D → spread ESG base.
@@ -443,7 +449,7 @@ export function estructurarDeuda(v: ResultadoVista, perfil: PerfilFinanciero): E
 //  Greenium (premio) para el cliente blindado (finanzas sostenibles).
 // ============================================================================
 
-export type CategoriaCredito = "A" | "B" | "C" | "D" | "fuera_alcance";
+export type CategoriaCredito = "A" | "B" | "C" | "D" | "bursatil" | "fuera_alcance";
 
 export interface Spread {
   aplica: boolean;                 // false para corporativo (fuera de alcance)
@@ -458,6 +464,7 @@ export interface Spread {
 
 const TIIE_FONDEO = 6.75; // TIIE fondeo vigente (%). Editable si cambia.
 const UMBRAL_BANCABLE_SPREAD = 1.20;
+const SPREAD_BURSATIL_PB = 150; // referencia quirografaria para emisor bursátil (no scorecard FIRA)
 
 // Spread base por categoría ESG (PyME FIRA). En puntos base sobre TIIE.
 // A = greenium (bajo la base); B = base PyME; C/D = castigo ESG (ancla Expansión).
@@ -475,12 +482,30 @@ export function calcularSpread(
   dscr: number | null,             // DSCR del escenario
   perfilTamano: string,            // 'pyme' | 'mediana' | 'cotiza_bolsa'
 ): Spread {
-  // Fuera de alcance: corporativo que cotiza.
-  if (perfilTamano === "cotiza_bolsa" || perfilTamano === "multinacional") {
+  // Multinacional: fondeo global, sin referencia local comparable → fuera de alcance.
+  if (perfilTamano === "multinacional") {
     return {
       aplica: false, categoria: "fuera_alcance", spread_pb: null, spread_pct: null,
       tiie: TIIE_FONDEO, tasa_total_pct: null, ajuste_financiero_pb: 0,
-      nota: "Perfil corporativo: fondeo vía mercado de capitales (emisión bursátil). El scorecard de crédito PyME FIRA no aplica a este tamaño.",
+      nota: "Perfil multinacional: fondeo vía mercado de capitales global. Sin referencia local comparable; el scorecard de crédito PyME FIRA no aplica.",
+    };
+  }
+
+  // Cotiza en bolsa: el scorecard FIRA no aplica (se fondea con emisión bursátil),
+  // pero se da una referencia SIMPLE de deuda quirografaria a TIIE + 150 pb fijos.
+  // No la modula la banda ESG ni el DSCR (spread bursátil = mercado de capitales;
+  // el DSCR acá se calcula con un perfil PyME agro de respaldo no representativo).
+  if (perfilTamano === "cotiza_bolsa") {
+    const spreadPct = +(SPREAD_BURSATIL_PB / 100).toFixed(2);
+    return {
+      aplica: true,
+      categoria: "bursatil",
+      spread_pb: SPREAD_BURSATIL_PB,
+      spread_pct: spreadPct,
+      tiie: TIIE_FONDEO,
+      tasa_total_pct: +(TIIE_FONDEO + spreadPct).toFixed(2),
+      ajuste_financiero_pb: 0,
+      nota: "Emisor bursátil: referencia de deuda quirografaria a TIIE + 150 pb (mercado de capitales). No es el scorecard de crédito PyME FIRA; a este tamaño el riesgo ESG y el DSCR no modulan la tasa.",
     };
   }
 

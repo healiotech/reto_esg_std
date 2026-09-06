@@ -211,7 +211,11 @@ Deno.serve(async (req) => {
       const estructura = estructurarDeuda(sim.actual, perfil);
       const spread = calcularSpread(bandaReal, sim.actual.indicadores.dscr, perfilTamano);
 
-      if (!spread.aplica) {
+      // "bursatil" trae aplica=true solo para mostrar una tasa de referencia;
+      // la estructuración de crédito FIRA sigue fuera de alcance para un emisor
+      // listado, así que en el pipeline cuenta como fuera_alcance igual que
+      // multinacional.
+      if (!spread.aplica || spread.categoria === "bursatil") {
         pipeline.fuera_alcance += 1;
       } else if (estructura.bancable_base) {
         pipeline.viables += 1;
