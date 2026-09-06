@@ -24,8 +24,9 @@
 --  todo-cumple totalmente verificado sigue en 0.000.
 --
 --  Recrea v_riesgo_norma sobre la definición vigente (migración 27) + la vista
---  gana una columna nueva `incumplimiento_efectivo` (aditiva, no rompe
---  consumidores). Requiere las migraciones previas de la vista.
+--  gana una columna nueva `incumplimiento_efectivo` AL FINAL (create or replace
+--  view solo permite agregar columnas al final, no intercalarlas). Aditiva, no
+--  rompe consumidores. Requiere las migraciones previas de la vista.
 -- ============================================================================
 
 create or replace view v_riesgo_norma as
@@ -39,7 +40,6 @@ select
   n.fuente_url,
   r.estatus,
   r.factor_incumplimiento,
-  ie.incumplimiento_efectivo,           -- factor_incumplimiento + haircut de confianza (SOLO score)
   r.nivel_confianza,
   n.es_descalificante,
   b.riesgo_base_compartido,
@@ -58,7 +58,8 @@ select
   n.multa_unidad,
   n.multa_nota,
   n.prob_fiscalizacion,
-  n.tema
+  n.tema,
+  ie.incumplimiento_efectivo           -- factor_incumplimiento + haircut de confianza (SOLO score); columna nueva al final
 from respuestas r
 join normas n           on n.id = r.norma_id
 join evaluaciones e     on e.id = r.evaluacion_id
