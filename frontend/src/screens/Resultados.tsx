@@ -1414,17 +1414,6 @@ function SimuladorFinanciero({
                   escenario={esActual ? undefined : vistaActiva.balance.pasivo_capital_total}
                   total
                 />
-                <div
-                  className="flex items-center gap-1.5 mt-1 pt-2 text-[11px]"
-                  style={{
-                    borderTop: '1px dashed var(--doc-rule-strong)',
-                    color: vistaActiva.balance.activo_total === vistaActiva.balance.pasivo_capital_total ? 'var(--ok-fg)' : 'var(--state-danger)',
-                  }}
-                >
-                  {vistaActiva.balance.activo_total === vistaActiva.balance.pasivo_capital_total
-                    ? '✓ Activo total = Pasivo + Capital'
-                    : '⚠ El balance no cuadra'}
-                </div>
               </EstadoFinancieroBloque>
             </div>
           </div>
