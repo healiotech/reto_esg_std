@@ -447,6 +447,22 @@ function Recientes({
 // Nivel de riesgo ESG general + conteo de normas en regla, mismo criterio y
 // estilo que la sección 1 de Resultados y las cards de Clientes.tsx.
 function RiesgoEsgMini({ resultado }: { resultado: ResultadoEvaluacion }) {
+  if (resultado.no_evaluable) {
+    return (
+      <div className="flex flex-col items-end gap-1">
+        <span className="ds-eyebrow" style={{ fontSize: '0.5625rem' }}>
+          Elegibilidad
+        </span>
+        <span
+          className="inline-flex items-center px-2 py-0.5 font-semibold text-[11px] uppercase tracking-[0.03em]"
+          style={{ background: 'var(--red-100)', color: 'var(--red-700)', borderRadius: 3 }}
+        >
+          No evaluable
+        </span>
+      </div>
+    );
+  }
+
   const bandaGlobal = peorBandaGeneral(resultado);
   const total = resultado.detalle.length;
   const enRegla = normasEnRegla(resultado);

@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { obtenerEvaluacionParaEditar } from '../lib/obtenerEvaluacionParaEditar';
 import { eliminarEvaluacion } from '../lib/eliminarEvaluacion';
 import { buscarCliente, type ClienteEncontrado } from '../lib/buscarCliente';
-import type { ClienteInput, EvaluacionParaEditar, EvaluacionSesion, Jurisdiccion, PerfilTamano, Sector, SubsectorAgro } from '../types';
+import type { ActividadProhibida, ClienteInput, EvaluacionParaEditar, EvaluacionSesion, Jurisdiccion, PerfilTamano, Sector, SubsectorAgro } from '../types';
 import { AlertIcon } from '../components/ScoreCard';
 import { SantanderLogo } from '../components/SantanderLogo';
 import { BANDA_COLOR, BANDA_RANGO, normasEnRegla, peorBandaGeneral } from '../lib/banda';
@@ -38,6 +38,7 @@ interface ClientesProps {
   mostrarForm: boolean;
   onMostrarFormChange: (mostrar: boolean) => void;
   onNuevaEvaluacion: (cliente: ClienteInput, sectorNombre: string, jurisdiccionNombre: string) => void;
+  onRegistrarNoEvaluable: (cliente: ClienteInput, sectorNombre: string, jurisdiccionNombre: string) => Promise<void>;
   onVerEvaluacion: (evaluacion: EvaluacionSesion) => void;
   onEditarEvaluacion: (datos: EvaluacionParaEditar) => void;
   onEvaluacionEliminada: (evaluacionId: string) => void;
@@ -50,12 +51,14 @@ export function Clientes({
   mostrarForm,
   onMostrarFormChange,
   onNuevaEvaluacion,
+  onRegistrarNoEvaluable,
   onVerEvaluacion,
   onEditarEvaluacion,
   onEvaluacionEliminada,
 }: ClientesProps) {
   const [sectores, setSectores] = useState<Sector[]>([]);
   const [jurisdicciones, setJurisdicciones] = useState<Jurisdiccion[]>([]);
+  const [actividadesProhibidas, setActividadesProhibidas] = useState<ActividadProhibida[]>([]);
   const [cargandoCatalogos, setCargandoCatalogos] = useState(true);
   const [errorCatalogos, setErrorCatalogos] = useState<string | null>(null);
 
@@ -75,6 +78,10 @@ export function Clientes({
   const [esExportador, setEsExportador] = useState(false);
   const [enZonaRiesgo, setEnZonaRiesgo] = useState(false);
   const [zonaRiesgoNota, setZonaRiesgoNota] = useState('');
+  const [participaProhibida, setParticipaProhibida] = useState(false);
+  const [actividadProhibidaId, setActividadProhibidaId] = useState('');
+  const [registrando, setRegistrando] = useState(false);
+  const [errorRegistro, setErrorRegistro] = useState<string | null>(null);
 
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [errorEdicion, setErrorEdicion] = useState<{ id: string; mensaje: string } | null>(null);
@@ -143,9 +150,14 @@ export function Clientes({
         setEsExportador(r.cliente.es_exportador);
         setEnZonaRiesgo(r.cliente.en_zona_riesgo);
         setZonaRiesgoNota(r.cliente.zona_riesgo_nota ?? '');
+        setParticipaProhibida(r.cliente.actividad_prohibida_id != null);
+        setActividadProhibidaId(r.cliente.actividad_prohibida_id ?? '');
       } else {
         setClienteVinculado(null);
+        setParticipaProhibida(false);
+        setActividadProhibidaId('');
       }
+      setErrorRegistro(null);
       setBusquedaHecha(true);
     } catch (e) {
       setErrorBusqueda(e instanceof Error ? e.message : 'No se pudo buscar el cliente.');
@@ -160,6 +172,9 @@ export function Clientes({
     setClienteVinculado(null);
     setBusquedaHecha(false);
     setErrorBusqueda(null);
+    setParticipaProhibida(false);
+    setActividadProhibidaId('');
+    setErrorRegistro(null);
     onMostrarFormChange(true);
   }
 
@@ -200,21 +215,30 @@ export function Clientes({
       setErrorCatalogos(null);
       // Solo estados (nivel='estatal'): federal/internacional ya no se eligen
       // acá, aplican automáticamente vía las 3 capas de normas_aplicables.
-      const [{ data: sectoresData, error: eSec }, { data: jurisdiccionesData, error: eJur }] =
-        await Promise.all([
-          supabase.from('sectores').select('id, clave, nombre').order('nombre'),
-          supabase
-            .from('jurisdicciones')
-            .select('id, clave, nombre, nivel, contexto_riesgo')
-            .eq('nivel', 'estatal')
-            .order('nombre'),
-        ]);
+      const [
+        { data: sectoresData, error: eSec },
+        { data: jurisdiccionesData, error: eJur },
+        { data: actividadesData, error: eAct },
+      ] = await Promise.all([
+        supabase.from('sectores').select('id, clave, nombre').order('nombre'),
+        supabase
+          .from('jurisdicciones')
+          .select('id, clave, nombre, nivel, contexto_riesgo')
+          .eq('nivel', 'estatal')
+          .order('nombre'),
+        supabase
+          .from('actividades_prohibidas')
+          .select('id, clave, etiqueta, clausula_politica, descripcion')
+          .eq('activa', true)
+          .order('orden'),
+      ]);
       if (cancelado) return;
-      if (eSec || eJur) {
+      if (eSec || eJur || eAct) {
         setErrorCatalogos('No se pudieron cargar los catálogos de sector/jurisdicción.');
       } else {
         setSectores(sectoresData ?? []);
         setJurisdicciones(jurisdiccionesData ?? []);
+        setActividadesProhibidas(actividadesData ?? []);
         setSectorId((prev) => prev || sectoresData?.[0]?.id || '');
         setJurisdiccionId((prev) => prev || jurisdiccionesData?.[0]?.id || '');
       }
@@ -227,18 +251,26 @@ export function Clientes({
     };
   }, [mostrarForm]);
 
+  // Actividad prohibida: bloqueada (solo lectura) si el cliente vinculado ya
+  // viene marcado; el analista puede añadirla a un cliente sin marcar.
+  const prohibidaBloqueada = bloqueado && clienteVinculado?.actividad_prohibida_id != null;
+  const esNoEvaluable = participaProhibida && actividadProhibidaId.length > 0;
+  const actividadProhibidaLabel = esNoEvaluable
+    ? actividadesProhibidas.find((a) => a.id === actividadProhibidaId)?.etiqueta ?? null
+    : null;
+
   const puedeContinuar =
     numeroCliente.trim().length > 0 &&
     busquedaHecha &&
-    (bloqueado ? true : nombre.trim().length > 0 && sectorId && jurisdiccionId);
+    (bloqueado ? true : nombre.trim().length > 0 && sectorId && jurisdiccionId) &&
+    (!participaProhibida || actividadProhibidaId.length > 0);
 
-  function handleContinuar() {
-    if (!puedeContinuar) return;
+  function construirClienteInput(): { cliente: ClienteInput; sectorNombre: string; jurisdiccionNombre: string } {
     const c = clienteVinculado;
     const sectorNombre = c ? c.sectorNombre : sectores.find((s) => s.id === sectorId)?.nombre ?? '';
     const jurisdiccionNombre = c ? c.jurisdiccionNombre : jurisdicciones.find((j) => j.id === jurisdiccionId)?.nombre ?? '';
-    onNuevaEvaluacion(
-      {
+    return {
+      cliente: {
         numero_cliente: numeroCliente.trim(),
         cliente_id: c?.id ?? null,
         nombre: (c?.nombre ?? nombre).trim(),
@@ -251,10 +283,28 @@ export function Clientes({
         zona_riesgo_nota: c
           ? c.zona_riesgo_nota
           : enZonaRiesgo && zonaRiesgoNota.trim() ? zonaRiesgoNota.trim() : null,
+        actividad_prohibida_id: esNoEvaluable ? actividadProhibidaId : null,
       },
       sectorNombre,
       jurisdiccionNombre,
-    );
+    };
+  }
+
+  async function handleContinuar() {
+    if (!puedeContinuar || registrando) return;
+    const { cliente, sectorNombre, jurisdiccionNombre } = construirClienteInput();
+    if (esNoEvaluable) {
+      setRegistrando(true);
+      setErrorRegistro(null);
+      try {
+        await onRegistrarNoEvaluable(cliente, sectorNombre, jurisdiccionNombre);
+      } catch (e) {
+        setErrorRegistro(e instanceof Error ? e.message : 'No se pudo registrar el cliente como no evaluable.');
+        setRegistrando(false);
+      }
+      return;
+    }
+    onNuevaEvaluacion(cliente, sectorNombre, jurisdiccionNombre);
   }
 
   return (
@@ -358,13 +408,70 @@ export function Clientes({
 
             <Divider />
 
+            <FormSection step={2} titulo="Elegibilidad">
+              <div className="flex flex-col gap-4">
+                <div
+                  className="flex flex-col gap-4 px-5 py-4"
+                  style={{ background: 'var(--ctx-100)', borderRadius: 'var(--radius-control)' }}
+                >
+                  <div className="flex items-center justify-between gap-5">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[14px] font-semibold" style={{ color: 'var(--doc-ink-900)' }}>
+                        ¿El cliente participa en alguna actividad prohibida por la política ESG de Santander?
+                      </span>
+                      <span className="text-[13px] leading-tight" style={{ color: 'var(--doc-ink-500)' }}>
+                        Actividades vetadas por la política de Riesgos Medioambientales, Sociales y de Cambio Climático. Si
+                        aplica, el cliente es no evaluable: no se aplica el cuestionario de normas.
+                      </span>
+                    </div>
+                    <Switch
+                      checked={participaProhibida}
+                      onChange={(v) => {
+                        setParticipaProhibida(v);
+                        if (!v) setActividadProhibidaId('');
+                      }}
+                      disabled={prohibidaBloqueada}
+                    />
+                  </div>
+                  {participaProhibida && (
+                    <Select
+                      id="actividad-prohibida"
+                      label="Actividad prohibida"
+                      value={actividadProhibidaId}
+                      onChange={setActividadProhibidaId}
+                      disabled={cargandoCatalogos || prohibidaBloqueada}
+                      options={[
+                        { value: '', label: 'Selecciona una actividad…' },
+                        ...actividadesProhibidas.map((a) => ({ value: a.id, label: a.etiqueta })),
+                      ]}
+                    />
+                  )}
+                </div>
+
+                {esNoEvaluable && (
+                  <div
+                    className="flex items-start gap-2.5 px-4 py-3 text-[13px] leading-normal"
+                    style={{ background: 'var(--red-100)', color: 'var(--red-800)', borderRadius: 'var(--radius-control)' }}
+                  >
+                    <AlertIcon color="var(--red-700)" />
+                    <span>
+                      Este cliente quedará registrado como <strong className="font-semibold">NO EVALUABLE</strong> por
+                      actividad prohibida. No se aplica el cuestionario de normas, score ni simulador.
+                    </span>
+                  </div>
+                )}
+              </div>
+            </FormSection>
+
+            <Divider />
+
             {bloqueado ? (
-              <FormSection step={2} titulo="Perfil registrado del cliente">
-                <ResumenClienteVinculado cliente={clienteVinculado} />
+              <FormSection step={3} titulo="Perfil registrado del cliente">
+                <ResumenClienteVinculado cliente={clienteVinculado} actividad={actividadProhibidaLabel} />
               </FormSection>
             ) : (
               <>
-                <FormSection step={2} titulo="¿Dónde opera?">
+                <FormSection step={3} titulo="¿Dónde opera?">
                   <div className="flex flex-col gap-5">
                     <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                       <Select
@@ -426,7 +533,7 @@ export function Clientes({
 
                 <Divider />
 
-                <FormSection step={3} titulo="Tamaño y alcance">
+                <FormSection step={4} titulo="Tamaño y alcance">
                   <div className="flex flex-col gap-5">
                     <div>
                       <p className="ds-eyebrow m-0 mb-3">Perfil de tamaño</p>
@@ -476,14 +583,27 @@ export function Clientes({
               </>
             )}
 
+            {errorRegistro && (
+              <p
+                className="m-0 px-3 py-2 text-[13px]"
+                style={{ color: 'var(--red-700)', background: 'var(--red-100)', borderRadius: 'var(--radius-control)' }}
+              >
+                {errorRegistro}
+              </p>
+            )}
+
             <div className="flex justify-end pt-2">
               <Button
                 variant="primary"
                 size="l"
-                disabled={!puedeContinuar || (!bloqueado && cargandoCatalogos)}
+                disabled={!puedeContinuar || registrando || (!bloqueado && cargandoCatalogos)}
                 onClick={handleContinuar}
               >
-                Continuar al cuestionario
+                {esNoEvaluable
+                  ? registrando
+                    ? 'Registrando…'
+                    : 'Registrar como no evaluable'
+                  : 'Continuar al cuestionario'}
               </Button>
             </div>
           </div>
@@ -554,6 +674,7 @@ export function Clientes({
                       <div style={{ borderTop: '1px solid var(--doc-rule)' }}>
                         {g.evals.map((ev) => {
                           const cerrada = ev.resultado.estado === 'cerrada';
+                          const editable = !cerrada && !ev.resultado.no_evaluable;
                           const confirmandoEsta = borrado.tipo !== 'idle' && borrado.evaluacionId === ev.id;
                           return (
                             <div key={ev.id} style={{ borderTop: '1px solid var(--doc-rule)' }}>
@@ -584,19 +705,21 @@ export function Clientes({
 
                                   {!cerrada && (
                                     <div className="flex items-center gap-1">
-                                      <button
-                                        type="button"
-                                        aria-label="Editar evaluación"
-                                        disabled={editandoId === ev.id}
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleEditar(ev);
-                                        }}
-                                        className="flex h-8 w-8 items-center justify-center rounded-full disabled:opacity-50"
-                                        style={{ color: 'var(--doc-ink-500)' }}
-                                      >
-                                        {editandoId === ev.id ? <SpinnerIcon /> : <PencilIcon />}
-                                      </button>
+                                      {editable && (
+                                        <button
+                                          type="button"
+                                          aria-label="Editar evaluación"
+                                          disabled={editandoId === ev.id}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleEditar(ev);
+                                          }}
+                                          className="flex h-8 w-8 items-center justify-center rounded-full disabled:opacity-50"
+                                          style={{ color: 'var(--doc-ink-500)' }}
+                                        >
+                                          {editandoId === ev.id ? <SpinnerIcon /> : <PencilIcon />}
+                                        </button>
+                                      )}
                                       <button
                                         type="button"
                                         aria-label="Eliminar evaluación"
@@ -696,7 +819,7 @@ function Divider() {
 
 // Perfil de solo lectura del cliente vinculado: sus datos registrados mandan, no
 // se editan al añadir una evaluación.
-function ResumenClienteVinculado({ cliente }: { cliente: ClienteEncontrado }) {
+function ResumenClienteVinculado({ cliente, actividad }: { cliente: ClienteEncontrado; actividad?: string | null }) {
   const filas: [string, string][] = [
     ['Sector', cliente.sectorNombre || '—'],
     ['Estado de operación', cliente.jurisdiccionNombre || '—'],
@@ -704,6 +827,7 @@ function ResumenClienteVinculado({ cliente }: { cliente: ClienteEncontrado }) {
     ['Perfil de tamaño', PERFILES.find((p) => p.value === cliente.perfil_tamano)?.label ?? cliente.perfil_tamano],
     ['Exporta a la UE', cliente.es_exportador ? 'Sí' : 'No'],
     ['Zona sensible', cliente.en_zona_riesgo ? cliente.zona_riesgo_nota?.trim() || 'Sí' : 'No'],
+    ...(actividad ? ([['Actividad prohibida', actividad]] as [string, string][]) : []),
   ];
   return (
     <dl className="m-0 grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
@@ -745,6 +869,22 @@ function ResumenEvalMini({
   resultado: EvaluacionSesion['resultado'];
   anterior?: EvaluacionSesion['resultado'];
 }) {
+  if (resultado.no_evaluable) {
+    return (
+      <div className="flex flex-col items-end gap-1">
+        <span className="ds-eyebrow" style={{ fontSize: '0.5625rem' }}>
+          Elegibilidad
+        </span>
+        <span
+          className="inline-flex items-center gap-1.5 px-2 py-0.5 font-semibold text-[11px] uppercase tracking-[0.03em]"
+          style={{ background: 'var(--red-100)', color: 'var(--red-700)', borderRadius: 3 }}
+        >
+          No evaluable
+        </span>
+      </div>
+    );
+  }
+
   const bandaGlobal = peorBandaGeneral(resultado);
   const total = resultado.detalle.length;
   const enRegla = normasEnRegla(resultado);

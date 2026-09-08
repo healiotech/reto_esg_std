@@ -13,6 +13,7 @@ export interface ClienteEncontrado {
   es_exportador: boolean;
   en_zona_riesgo: boolean;
   zona_riesgo_nota: string | null;
+  actividad_prohibida_id: string | null;
   sectorNombre: string;
   jurisdiccionNombre: string;
 }

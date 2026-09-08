@@ -151,6 +151,10 @@ Deno.serve(async (req) => {
 
     for (const ev of evals) {
       const res = (ev as any).resultado ?? {};
+      // Clientes NO EVALUABLES (actividad prohibida): quedan fuera de todos los
+      // agregados — distribución, exposición, pipeline y top de temas. Siguen
+      // contando en total_clientes / total_evaluaciones (calculados arriba).
+      if (res.no_evaluable) continue;
       const cli = (ev as any).clientes ?? {};
       const subsector: string = cli.subsector ?? "ganaderia";
       const perfilTamano: string = cli.perfil_tamano ?? "pyme";

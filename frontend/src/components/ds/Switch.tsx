@@ -2,23 +2,28 @@ interface SwitchProps {
   label?: string;
   checked: boolean;
   onChange: (checked: boolean) => void;
+  disabled?: boolean;
 }
 
 /** Santander DS `Switch` component, ported from _ds_bundle.js (adapted to be controlled). */
-export function Switch({ label, checked, onChange }: SwitchProps) {
+export function Switch({ label, checked, onChange, disabled = false }: SwitchProps) {
   return (
     <label
       role="switch"
       aria-checked={checked}
+      aria-disabled={disabled || undefined}
       style={{
         display: 'inline-flex',
         alignItems: 'center',
         gap: 10,
         fontFamily: 'var(--font-sans)',
         fontSize: 14,
-        cursor: 'pointer',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.55 : 1,
       }}
-      onClick={() => onChange(!checked)}
+      onClick={() => {
+        if (!disabled) onChange(!checked);
+      }}
     >
       <span
         style={{

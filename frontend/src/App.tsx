@@ -5,7 +5,9 @@ import { Inicio } from './screens/Inicio';
 import { Clientes } from './screens/Clientes';
 import { Cuestionario } from './screens/Cuestionario';
 import { Resultados } from './screens/Resultados';
+import { NoEvaluable } from './screens/NoEvaluable';
 import { listarEvaluaciones } from './lib/listarEvaluaciones';
+import { evaluar } from './lib/evaluar';
 import type { ClienteInput, EvaluacionParaEditar, EvaluacionSesion, ResultadoEvaluacion } from './types';
 
 type Pantalla = Seccion | 'cuestionario' | 'resultados';
@@ -64,6 +66,27 @@ function App() {
     setClienteEnCurso({ cliente, sectorNombre, jurisdiccionNombre });
     setResultadoActivo(null);
     setPantalla('cuestionario');
+  }
+
+  // Cliente NO EVALUABLE por actividad prohibida: se registra la evaluación
+  // (estado 'no_evaluable', sin respuestas) y se salta directo al resultado.
+  // Lanza si la edge function falla; `Clientes.tsx` muestra el error.
+  async function handleRegistrarNoEvaluable(cliente: ClienteInput, sectorNombre: string, jurisdiccionNombre: string) {
+    const resultado = await evaluar(cliente, []);
+    setClienteEnCurso({ cliente, sectorNombre, jurisdiccionNombre });
+    setResultadoActivo(resultado);
+    setEvaluaciones((prev) => [
+      {
+        id: resultado.evaluacion_id,
+        cliente,
+        sectorNombre,
+        jurisdiccionNombre,
+        resultado,
+        fecha: new Date().toISOString(),
+      },
+      ...prev,
+    ]);
+    setPantalla('resultados');
   }
 
   function handleCompletado(resultado: ResultadoEvaluacion) {
@@ -172,6 +195,7 @@ function App() {
               mostrarForm={mostrarFormCliente}
               onMostrarFormChange={setMostrarFormCliente}
               onNuevaEvaluacion={handleNuevaEvaluacion}
+              onRegistrarNoEvaluable={handleRegistrarNoEvaluable}
               onVerEvaluacion={handleVerEvaluacion}
               onEditarEvaluacion={handleEditarEvaluacion}
               onEvaluacionEliminada={handleEvaluacionEliminada}
@@ -191,14 +215,24 @@ function App() {
           )}
 
           {pantalla === 'resultados' && clienteEnCurso && resultadoActivo && (
-            <Resultados
-              cliente={clienteEnCurso.cliente}
-              sectorNombre={clienteEnCurso.sectorNombre}
-              jurisdiccionNombre={clienteEnCurso.jurisdiccionNombre}
-              resultado={resultadoActivo}
-              onEvaluacionCerrada={handleEvaluacionCerrada}
-              onVolverAClientes={volverAClientes}
-            />
+            resultadoActivo.no_evaluable ? (
+              <NoEvaluable
+                cliente={clienteEnCurso.cliente}
+                sectorNombre={clienteEnCurso.sectorNombre}
+                jurisdiccionNombre={clienteEnCurso.jurisdiccionNombre}
+                resultado={resultadoActivo}
+                onVolverAClientes={volverAClientes}
+              />
+            ) : (
+              <Resultados
+                cliente={clienteEnCurso.cliente}
+                sectorNombre={clienteEnCurso.sectorNombre}
+                jurisdiccionNombre={clienteEnCurso.jurisdiccionNombre}
+                resultado={resultadoActivo}
+                onEvaluacionCerrada={handleEvaluacionCerrada}
+                onVolverAClientes={volverAClientes}
+              />
+            )
           )}
         </main>
         </div>

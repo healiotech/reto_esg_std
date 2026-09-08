@@ -68,6 +68,19 @@ export interface NormaAplicable {
 /** Subsector agropecuario (clientes.subsector). Selecciona el perfil financiero FIRA junto con perfil_tamano. */
 export type SubsectorAgro = 'ganaderia' | 'agricultura';
 
+/**
+ * Actividad prohibida por la política ESG del Grupo Santander (catálogo
+ * `actividades_prohibidas`). Un cliente marcado con una es NO EVALUABLE: no se
+ * aplica el cuestionario de normas.
+ */
+export interface ActividadProhibida {
+  id: string;
+  clave: string;
+  etiqueta: string;
+  clausula_politica: string;
+  descripcion: string;
+}
+
 export interface ClienteInput {
   /** Número de cliente del banco (clientes.numero_cliente, UNIQUE). Clave de deduplicación: identifica al cliente entre evaluaciones. */
   numero_cliente: string;
@@ -88,6 +101,8 @@ export interface ClienteInput {
   /** El activo del cliente está en/cerca de una zona sensible o restringida (ANP, veda, etc.). Contexto cualitativo, no modula el score. */
   en_zona_riesgo: boolean;
   zona_riesgo_nota: string | null;
+  /** Actividad prohibida (`actividades_prohibidas.id`). Si está presente, el cliente es NO EVALUABLE. `null` en el caso normal. */
+  actividad_prohibida_id: string | null;
 }
 
 export interface RespuestaInput {
@@ -127,9 +142,11 @@ export interface DetalleNorma {
   multa_max: number | null;
   multa_unidad: MultaUnidad | null;
   multa_nota: string | null;
+  /** Política(s) interna(s) de Santander vinculada(s) a la norma (`normas.politica_interna`). Texto libre; varias van separadas por ";". `null` si no está mapeada. */
+  politica_interna: string | null;
 }
 
-export type EstadoEvaluacion = 'borrador' | 'completa' | 'cerrada';
+export type EstadoEvaluacion = 'borrador' | 'completa' | 'no_evaluable' | 'cerrada';
 
 export interface ExposicionDetalleNorma {
   norma_titulo: string;
@@ -167,6 +184,9 @@ export interface ResultadoEvaluacion {
   /** Resumen ejecutivo narrativo generado por IA (edge function `generar-narrativa`). `null` mientras no se genera. */
   resumen_ejecutivo?: string | null;
   resumen_generado_en?: string | null;
+  /** `true` cuando el cliente quedó marcado como NO EVALUABLE por actividad prohibida: no hay score, exposición ni simulador (los campos anteriores van en cero). */
+  no_evaluable?: boolean;
+  actividad_prohibida?: ActividadProhibida | null;
 }
 
 /** Sesión en memoria: una evaluación completa ligada al nombre del cliente. */

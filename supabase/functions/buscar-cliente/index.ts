@@ -45,7 +45,7 @@ Deno.serve(async (req) => {
       .from("clientes")
       .select(`
         id, nombre, sector_id, jurisdiccion_id, perfil_tamano, subsector,
-        es_exportador, en_zona_riesgo, zona_riesgo_nota,
+        es_exportador, en_zona_riesgo, zona_riesgo_nota, actividad_prohibida_id,
         sectores ( nombre ),
         jurisdicciones ( nombre )
       `)
@@ -67,6 +67,7 @@ Deno.serve(async (req) => {
       es_exportador: boolean;
       en_zona_riesgo: boolean;
       zona_riesgo_nota: string | null;
+      actividad_prohibida_id: string | null;
       sectores: { nombre: string } | null;
       jurisdicciones: { nombre: string } | null;
     };
@@ -84,6 +85,7 @@ Deno.serve(async (req) => {
         es_exportador: c.es_exportador,
         en_zona_riesgo: c.en_zona_riesgo,
         zona_riesgo_nota: c.zona_riesgo_nota,
+        actividad_prohibida_id: c.actividad_prohibida_id,
         sectorNombre: c.sectores?.nombre ?? "",
         jurisdiccionNombre: c.jurisdicciones?.nombre ?? "Sin especificar",
       },

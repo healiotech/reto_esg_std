@@ -42,6 +42,12 @@ interface ClienteInput {
   es_exportador?: boolean;
   en_zona_riesgo?: boolean;
   zona_riesgo_nota?: string | null;
+  /**
+   * Actividad PROHIBIDA por la política ESG del Grupo Santander. Si viene, el
+   * cliente es NO EVALUABLE: se persiste una evaluación con estado
+   * 'no_evaluable' y sin respuestas/score/exposición.
+   */
+  actividad_prohibida_id?: string | null;
 }
 
 // Cuando evaluacion_id viene presente, es un re-cálculo desde "editar" en
@@ -58,7 +64,8 @@ Deno.serve(async (req) => {
     const { cliente, respuestas, evaluacion_id } = await req.json() as {
       cliente: ClienteInput; respuestas: RespuestaInput[]; evaluacion_id?: string;
     };
-    if (!cliente || !respuestas?.length) {
+    const esNoEvaluable = Boolean(cliente?.actividad_prohibida_id);
+    if (!cliente || (!esNoEvaluable && !respuestas?.length)) {
       return json({ error: "Falta cliente o respuestas" }, 400);
     }
     // El número de cliente es obligatorio al crear (es la clave de dedup).
@@ -171,6 +178,60 @@ Deno.serve(async (req) => {
         .select("id").single();
       if (eEv) throw eEv;
       ev = evNueva;
+    }
+
+    // 2-bis) Cliente NO EVALUABLE por actividad prohibida: se marca el cliente,
+    // se persiste la evaluación con estado 'no_evaluable' y un resultado mínimo
+    // (shape-compatible para que ningún consumidor reviente), y se corta acá —
+    // sin respuestas, sin score, sin exposición.
+    if (esNoEvaluable) {
+      const { error: eMarca } = await supabase
+        .from("clientes")
+        .update({ actividad_prohibida_id: cliente.actividad_prohibida_id })
+        .eq("id", cli.id);
+      if (eMarca) throw eMarca;
+
+      const { data: actividad, error: eAct } = await supabase
+        .from("actividades_prohibidas")
+        .select("id, clave, etiqueta, clausula_politica, descripcion")
+        .eq("id", cliente.actividad_prohibida_id!)
+        .maybeSingle();
+      if (eAct) throw eAct;
+      if (!actividad) return json({ error: "Actividad prohibida no encontrada" }, 400);
+
+      const CANAL_CERO = {
+        score: 0, banda: "Bajo", score_base: 0, max_norma: 0,
+        forzado_por_descalificante: false, multiplicador_sistemico: 1, factor_tamano: 1,
+      };
+      const resultadoNoEvaluable = {
+        no_evaluable: true,
+        actividad_prohibida: actividad,
+        credito: CANAL_CERO,
+        reputacion: CANAL_CERO,
+        pct_autoreportado: 0,
+        categorias_en_riesgo: [] as string[],
+        detalle: [] as unknown[],
+        exposicion: {
+          exposicion_min_mxn: 0, exposicion_max_mxn: 0, valor_uma: 0,
+          detalle_cuantificable: [], no_cuantificables: [], hay_no_cuantificable: false,
+        },
+      };
+      const ahoraNE = new Date().toISOString();
+      let qNE = supabase
+        .from("evaluaciones")
+        .update({ resultado: resultadoNoEvaluable, calculado_en: ahoraNE, estado: "no_evaluable" })
+        .eq("id", ev.id);
+      if (evaluacion_id) qNE = qNE.neq("estado", "cerrada");
+      const { data: neAct, error: eNE } = await qNE.select("id").maybeSingle();
+      if (eNE) throw eNE;
+      if (evaluacion_id && !neAct) {
+        return json({ error: "La evaluación cambió de estado antes de guardar los cambios. Vuelve a intentarlo." }, 409);
+      }
+
+      return json(
+        { evaluacion_id: ev.id, cliente_id: cli.id, estado: "no_evaluable", ...resultadoNoEvaluable },
+        200,
+      );
     }
 
     // 3) Respuestas
