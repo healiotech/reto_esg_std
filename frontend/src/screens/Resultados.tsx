@@ -192,6 +192,57 @@ interface ResultadosProps {
   onVolverAClientes: () => void;
 }
 
+// Políticas internas de Santander que quedan expuestas por las normas en
+// `no_cumple` / `parcial`. `normas.politica_interna` es texto libre y puede
+// listar varias separadas por ";" — se aplanan y deduplican.
+function politicasInternasEnRiesgo(detalle: DetalleNorma[]): string[] {
+  const vistas = new Map<string, string>();
+  for (const d of detalle) {
+    if (d.estatus !== 'no_cumple' && d.estatus !== 'parcial') continue;
+    if (!d.politica_interna) continue;
+    for (const parte of d.politica_interna.split(';')) {
+      const nombre = parte.trim().replace(/\.$/, '');
+      if (!nombre) continue;
+      const clave = nombre.toLowerCase();
+      if (!vistas.has(clave)) vistas.set(clave, nombre);
+    }
+  }
+  return [...vistas.values()];
+}
+
+function PoliticasInternasEnRiesgo({ detalle }: { detalle: DetalleNorma[] }) {
+  const politicas = politicasInternasEnRiesgo(detalle);
+  if (politicas.length === 0) return null;
+  return (
+    <details
+      className="group px-[var(--pad-x)] py-2.5"
+      style={{ background: 'var(--doc-paper)', borderBottom: '1px solid var(--doc-rule)' }}
+    >
+      <summary className="ds-summary" style={{ color: 'var(--brand)' }}>
+        <svg className="ds-summary-chev" width="11" height="11" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <path d="M7.5 4.5 13 10l-5.5 5.5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        {politicas.length} {politicas.length === 1 ? 'política interna' : 'políticas internas'} en riesgo
+      </summary>
+      <p className="m-0 mt-2 text-[11px] leading-snug" style={{ color: 'var(--red-700)' }}>
+        Comprometidas por normas en incumplimiento o cumplimiento parcial:
+      </p>
+      <ul className="m-0 mt-1.5 grid grid-cols-1 gap-x-8 gap-y-1 p-0 sm:grid-cols-2" style={{ listStyle: 'none' }}>
+        {politicas.map((p) => (
+          <li
+            key={p}
+            className="flex gap-1.5 text-[12px] leading-snug"
+            style={{ color: 'var(--red-700)' }}
+          >
+            <span aria-hidden="true" style={{ color: 'var(--brand)' }}>·</span>
+            {p}
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
 export function Resultados({
   cliente,
   sectorNombre,
@@ -364,6 +415,8 @@ export function Resultados({
               {cliente.nombre}
             </h1>
           </div>
+
+          <PoliticasInternasEnRiesgo detalle={resultado.detalle} />
 
         {/* ---- 1 · Dictamen de riesgo -------------------------------------
             El titular: nivel general + los dos canales + banderas críticas.
