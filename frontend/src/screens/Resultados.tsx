@@ -365,17 +365,6 @@ export function Resultados({
             </h1>
           </div>
 
-        {/* ---- 0 · Resumen ejecutivo (IA) -------------------------------
-            Lo primero que lee un comité de crédito: la síntesis narrativa del
-            análisis determinista, bajo demanda. La única sección con IA. */}
-        <ResumenEjecutivo
-          resumen={resumen}
-          resumenEn={resumenEn}
-          generando={generandoResumen}
-          error={errorResumen}
-          onGenerar={handleGenerarResumen}
-        />
-
         {/* ---- 1 · Dictamen de riesgo -------------------------------------
             El titular: nivel general + los dos canales + banderas críticas.
             Un analista debe entender el veredicto mirando solo este bloque. */}
@@ -505,9 +494,21 @@ export function Resultados({
           </div>
         </SeccionNumerada>
 
+        {/* ---- Síntesis del análisis (IA) -------------------------------
+            Cierre narrativo: llega después de que el lector vio toda la
+            evidencia. Se genera al montar la pantalla, así que para cuando
+            baja hasta acá ya está lista. La única sección con IA. */}
+        <ResumenEjecutivo
+          resumen={resumen}
+          resumenEn={resumenEn}
+          generando={generandoResumen}
+          error={errorResumen}
+          onGenerar={handleGenerarResumen}
+        />
+
         {/* ---- 6 · Acciones -----------------------------------------------
             Exportar PDF y verificar/cerrar — el cierre de la pantalla. La
-            "Recomendación" ahora vive en el Resumen ejecutivo (arriba). */}
+            "Recomendación" vive en la Síntesis del análisis, justo arriba. */}
         <SeccionNumerada numero={6} titulo="Acciones" subtitulo="Exportar el informe o cerrar la evaluación.">
           {cierre.tipo === 'confirmando' && (
             <div
@@ -2131,9 +2132,9 @@ function ResumenSkeleton() {
   );
 }
 
-// Bloque 0 — Resumen ejecutivo IA. Lo primero que lee el comité. Traduce el
-// análisis determinista a prosa; NO altera ningún número. Estados:
-// sin generar → generando → generado (+ regenerar) / error (no bloquea nada).
+// Síntesis del análisis (IA). Cierra la pantalla, después de toda la evidencia.
+// Traduce el análisis determinista a prosa; NO altera ningún número. Estados:
+// generando (skeleton) → generado / error (no bloquea nada).
 function ResumenEjecutivo({
   resumen,
   resumenEn,
@@ -2152,7 +2153,7 @@ function ResumenEjecutivo({
   return (
     <section style={{ borderTop: '1px solid var(--doc-rule)', scrollMarginTop: '12px' }}>
       <ZonaHeader nivel="seccion" headingLevel={2}>
-        Resumen ejecutivo
+        Síntesis del análisis
       </ZonaHeader>
       <div className="px-[var(--pad-x)] pt-4 pb-6">
         <SelloIA />
