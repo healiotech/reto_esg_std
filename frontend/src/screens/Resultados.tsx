@@ -1296,6 +1296,17 @@ function SimuladorFinanciero({
             <div className="ds-eyebrow" style={{ fontSize: '0.625rem' }}>
               Ciclo de conversión de efectivo
             </div>
+
+            {/* Desglose: los componentes que arman el CCC y el capital de trabajo. */}
+            <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2">
+              <MiniDato label="Días de cobro" valor={`${vistaActiva.indicadores.dias_cobro} d`} />
+              <MiniDato label="Días de inventario" valor={`${vistaActiva.indicadores.dias_inventario} d`} />
+              <MiniDato label="Días de pago" valor={`${vistaActiva.indicadores.dias_pago} d`} />
+              <MiniDato label="Cuentas por cobrar" valor={formatPesos(vistaActiva.indicadores.cuentas_por_cobrar)} />
+              <MiniDato label="Inventario" valor={formatPesos(vistaActiva.indicadores.inventario_valor)} />
+              <MiniDato label="Cuentas por pagar" valor={formatPesos(vistaActiva.indicadores.cuentas_por_pagar)} />
+            </div>
+
             <div
               className="grid grid-cols-1 sm:grid-cols-2 mt-3"
               style={{ gap: '1px', background: 'var(--doc-rule)', border: '1px solid var(--doc-rule)', borderRadius: 'var(--radius-control)', overflow: 'clip' }}
@@ -1736,6 +1747,21 @@ function IndicadorDestacado({
           Actual: {formato(valorActual)}
         </div>
       )}
+    </div>
+  );
+}
+
+// Dato de contexto minúsculo (label arriba, valor debajo). Para el desglose del
+// ciclo de efectivo: días de cobro/inventario/pago y los montos de CxC/inv/CxP.
+function MiniDato({ label, valor }: { label: string; valor: string }) {
+  return (
+    <div>
+      <div className="ds-eyebrow" style={{ fontSize: '0.5625rem' }}>
+        {label}
+      </div>
+      <div className="mt-0.5 tabular-nums font-semibold text-[13px]" style={{ color: 'var(--doc-ink-900)' }}>
+        {valor}
+      </div>
     </div>
   );
 }

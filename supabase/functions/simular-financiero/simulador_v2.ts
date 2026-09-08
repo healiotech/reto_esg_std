@@ -115,6 +115,13 @@ export interface Indicadores {
   requiere_fega: boolean;         // DSCR bajo el mínimo bancable (~1.20x)
   ciclo_conversion_efectivo: number; // días: inventario + CxC − CxP (con estrés por daño ESG)
   capital_trabajo_neto: number;      // MXN inmovilizados en el ciclo: (CxC + inventario) − CxP
+  // Desglose del ciclo (con el mismo estrés aplicado), para dar contexto:
+  dias_cobro: number;
+  dias_inventario: number;
+  dias_pago: number;
+  cuentas_por_cobrar: number;     // MXN
+  inventario_valor: number;       // MXN
+  cuentas_por_pagar: number;      // MXN (= balance.cuentas_por_pagar, replicado acá por cohesión)
 }
 export interface ResultadoVista {
   vista: Vista;
@@ -269,6 +276,12 @@ function construirVista(
     requiere_fega: dscr !== null && dscr < UMBRAL_FEGA,
     ciclo_conversion_efectivo: Math.round(ccc),
     capital_trabajo_neto: Math.round(capitalTrabajoNeto),
+    dias_cobro: Math.round(diasCxC),
+    dias_inventario: Math.round(diasInv),
+    dias_pago: Math.round(diasCxP),
+    cuentas_por_cobrar: Math.round(cuentasPorCobrar),
+    inventario_valor: Math.round(inventario),
+    cuentas_por_pagar: Math.round(cuentasPorPagar),
   };
 
   return {

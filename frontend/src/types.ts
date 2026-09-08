@@ -249,6 +249,13 @@ export interface IndicadoresFinancieros {
   ciclo_conversion_efectivo: number;
   /** Capital de trabajo neto (MXN inmovilizados): (CxC + inventario) − CxP. */
   capital_trabajo_neto: number;
+  /** Desglose del ciclo (mismo estrés aplicado), para contexto. */
+  dias_cobro: number;
+  dias_inventario: number;
+  dias_pago: number;
+  cuentas_por_cobrar: number; // MXN
+  inventario_valor: number; // MXN
+  cuentas_por_pagar: number; // MXN
 }
 
 /** Un estado financiero completo para una vista (actual o un escenario de referencia). */
