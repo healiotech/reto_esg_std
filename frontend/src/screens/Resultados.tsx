@@ -1289,6 +1289,40 @@ function SimuladorFinanciero({
             </div>
           </div>
 
+          {/* 4b-bis · Ciclo de conversión de efectivo — un riesgo ESG que se
+              materializa congela la operación: el inventario no rota, los clientes
+              retienen pagos y los proveedores cortan el crédito comercial. */}
+          <div className="px-4 py-4" style={{ borderTop: '1px solid var(--doc-rule)' }}>
+            <div className="ds-eyebrow" style={{ fontSize: '0.625rem' }}>
+              Ciclo de conversión de efectivo
+            </div>
+            <div
+              className="grid grid-cols-1 sm:grid-cols-2 mt-3"
+              style={{ gap: '1px', background: 'var(--doc-rule)', border: '1px solid var(--doc-rule)', borderRadius: 'var(--radius-control)', overflow: 'clip' }}
+            >
+              <MetricaCiclo
+                label="Días de ciclo (CCC)"
+                valor={vistaActiva.indicadores.ciclo_conversion_efectivo}
+                valorActual={actual.indicadores.ciclo_conversion_efectivo}
+                esActual={esActual}
+                color={color}
+                formato={(n) => `${n} días`}
+              />
+              <MetricaCiclo
+                label="Capital de trabajo neto"
+                valor={vistaActiva.indicadores.capital_trabajo_neto}
+                valorActual={actual.indicadores.capital_trabajo_neto}
+                esActual={esActual}
+                color={color}
+                formato={formatPesos}
+              />
+            </div>
+            <p className="m-0 mt-2 text-[11px] leading-relaxed" style={{ color: 'var(--doc-ink-500)' }}>
+              Más días y más capital inmovilizado = más caja atrapada en la operación, presión de liquidez que no aparece
+              en el EBITDA.
+            </p>
+          </div>
+
           {/* 4c · Estados financieros — Actual vs. escenario, lado a lado. Con
               la pestaña Actual (esActual) cada panel muestra una sola columna. */}
           <div className="px-4 py-4" style={{ borderTop: '1px solid var(--doc-rule)' }}>
@@ -1348,7 +1382,7 @@ function SimuladorFinanciero({
                   escenario={esActual ? undefined : vistaActiva.balance.activo_fijo}
                 />
                 <LineaEF
-                  label="Otros activos"
+                  label="Circulante operativo"
                   actual={actual.balance.otros_activos}
                   escenario={esActual ? undefined : vistaActiva.balance.otros_activos}
                 />
@@ -1360,9 +1394,14 @@ function SimuladorFinanciero({
                 />
                 <div className="my-1" />
                 <LineaEF
-                  label="Deuda"
+                  label="Deuda financiera"
                   actual={actual.balance.deuda}
                   escenario={esActual ? undefined : vistaActiva.balance.deuda}
+                />
+                <LineaEF
+                  label="Proveedores"
+                  actual={actual.balance.cuentas_por_pagar}
+                  escenario={esActual ? undefined : vistaActiva.balance.cuentas_por_pagar}
                 />
                 <LineaEF
                   label="Capital"
@@ -1704,6 +1743,43 @@ function IndicadorDestacado({
         </div>
       )}
       {!esActual && !nulo && !negativo && (
+        <div className="mt-1.5 tabular-nums text-[11px]" style={{ color: 'var(--doc-ink-500)' }}>
+          Actual: {formato(valorActual)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Métrica del ciclo de efectivo (CCC en días, capital de trabajo neto en MXN).
+// A diferencia de IndicadorDestacado no tiene lógica de EBITDA nulo/negativo:
+// para estas dos, "más" siempre es peor (más caja atrapada en la operación).
+function MetricaCiclo({
+  label,
+  valor,
+  valorActual,
+  esActual,
+  color,
+  formato,
+}: {
+  label: string;
+  valor: number;
+  valorActual: number;
+  esActual: boolean;
+  color: string;
+  formato: (n: number) => string;
+}) {
+  const empeoro = !esActual && valor > valorActual;
+  return (
+    <div className="p-4" style={{ background: 'var(--doc-paper)' }}>
+      <div className="ds-eyebrow">{label}</div>
+      <div
+        className="mt-2 ds-figure"
+        style={{ fontSize: 'var(--figure-xl)', color: empeoro ? color : 'var(--doc-ink-900)' }}
+      >
+        {formato(valor)}
+      </div>
+      {!esActual && (
         <div className="mt-1.5 tabular-nums text-[11px]" style={{ color: 'var(--doc-ink-500)' }}>
           Actual: {formato(valorActual)}
         </div>

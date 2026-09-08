@@ -206,6 +206,9 @@ export interface PerfilFinanciero {
   tasa_interes: number; // 0..1
   capex_pct_ingresos: number; // 0..1 — CAPEX operativo normal (no el de cumplimiento)
   amortizacion_anios: number; // plazo de amortización de la deuda (para el DSCR)
+  dias_cuentas_cobrar: number; // días del ciclo de efectivo (migración 32)
+  dias_inventario: number;
+  dias_cuentas_pagar: number;
 }
 
 export interface EstadoResultadosFinanciero {
@@ -219,9 +222,10 @@ export interface EstadoResultadosFinanciero {
 
 export interface BalanceGeneralFinanciero {
   activo_fijo: number;
-  otros_activos: number;
+  otros_activos: number; // circulante operativo: cuentas por cobrar + inventario
   activo_total: number;
-  deuda: number;
+  deuda: number; // deuda financiera (sin proveedores)
+  cuentas_por_pagar: number; // crédito comercial de proveedores
   capital: number;
   pasivo_capital_total: number; // debe cuadrar con activo_total
 }
@@ -241,6 +245,10 @@ export interface IndicadoresFinancieros {
   dscr: number | null;
   /** DSCR bajo el mínimo bancable (~1.20x): requeriría respaldo de garantía FEGA de FIRA. */
   requiere_fega: boolean;
+  /** Ciclo de conversión de efectivo en días: inventario + CxC − CxP, estresado por el daño ESG. */
+  ciclo_conversion_efectivo: number;
+  /** Capital de trabajo neto (MXN inmovilizados): (CxC + inventario) − CxP. */
+  capital_trabajo_neto: number;
 }
 
 /** Un estado financiero completo para una vista (actual o un escenario de referencia). */

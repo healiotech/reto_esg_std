@@ -104,7 +104,7 @@ Deno.serve(async (req) => {
     let perfil: PerfilFinanciero = { ...PERFIL_BASE_AGRO_PLACEHOLDER };
     const { data: pf } = await supabase
       .from("perfil_financiero_agro")
-      .select("margen_ebitda, deuda_ebitda, tasa_interes, capex_pct_ingresos, amortizacion_anios")
+      .select("margen_ebitda, deuda_ebitda, tasa_interes, capex_pct_ingresos, amortizacion_anios, dias_cuentas_cobrar, dias_inventario, dias_cuentas_pagar")
       .eq("subsector", subsector)
       .eq("perfil_tamano", perfilTamano)
       .maybeSingle();
@@ -122,6 +122,11 @@ Deno.serve(async (req) => {
         tasa_interes: Number(pf.tasa_interes),
         capex_pct_ingresos: Number(pf.capex_pct_ingresos),
         amortizacion_anios: Number(pf.amortizacion_anios),
+        // Días del ciclo de efectivo (migración 32). Fallback al placeholder si
+        // la fila aún no los tiene cargados.
+        dias_cuentas_cobrar: pf.dias_cuentas_cobrar != null ? Number(pf.dias_cuentas_cobrar) : PERFIL_BASE_AGRO_PLACEHOLDER.dias_cuentas_cobrar,
+        dias_inventario: pf.dias_inventario != null ? Number(pf.dias_inventario) : PERFIL_BASE_AGRO_PLACEHOLDER.dias_inventario,
+        dias_cuentas_pagar: pf.dias_cuentas_pagar != null ? Number(pf.dias_cuentas_pagar) : PERFIL_BASE_AGRO_PLACEHOLDER.dias_cuentas_pagar,
       };
     }
     // El usuario puede sobreescribir cualquier campo para explorar supuestos.

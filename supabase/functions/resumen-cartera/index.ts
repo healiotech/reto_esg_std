@@ -74,7 +74,7 @@ Deno.serve(async (req) => {
       await Promise.all([
         supabase.from("coef_materialidad_tema").select("tema, coeficiente, banda, en_canal_operativo"),
         supabase.from("parametros_financieros").select("valor").eq("clave", "uma_diaria").maybeSingle(),
-        supabase.from("perfil_financiero_agro").select("subsector, perfil_tamano, margen_ebitda, deuda_ebitda, tasa_interes, capex_pct_ingresos, amortizacion_anios"),
+        supabase.from("perfil_financiero_agro").select("subsector, perfil_tamano, margen_ebitda, deuda_ebitda, tasa_interes, capex_pct_ingresos, amortizacion_anios, dias_cuentas_cobrar, dias_inventario, dias_cuentas_pagar"),
         supabase.from("ingresos_base_tamano").select("perfil_tamano, ingresos_anuales"),
         supabase.from("intensidad_escenario").select("escenario, intensidad"),
       ]);
@@ -175,6 +175,9 @@ Deno.serve(async (req) => {
           tasa_interes: Number(pf.tasa_interes),
           capex_pct_ingresos: Number(pf.capex_pct_ingresos),
           amortizacion_anios: Number(pf.amortizacion_anios),
+          dias_cuentas_cobrar: (pf as any).dias_cuentas_cobrar != null ? Number((pf as any).dias_cuentas_cobrar) : PERFIL_BASE_AGRO_PLACEHOLDER.dias_cuentas_cobrar,
+          dias_inventario: (pf as any).dias_inventario != null ? Number((pf as any).dias_inventario) : PERFIL_BASE_AGRO_PLACEHOLDER.dias_inventario,
+          dias_cuentas_pagar: (pf as any).dias_cuentas_pagar != null ? Number((pf as any).dias_cuentas_pagar) : PERFIL_BASE_AGRO_PLACEHOLDER.dias_cuentas_pagar,
         };
       }
 

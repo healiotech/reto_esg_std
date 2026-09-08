@@ -14,6 +14,10 @@
 //     "Actual". Se financia 75% deuda / 25% capital, se deprecia a 10 años.
 //   · Tres estados financieros SECCIONADOS: Estado de Resultados, Balance
 //     General y Flujo de Efectivo (operativo/inversión/financiamiento).
+//   · CICLO DE CONVERSIÓN DE EFECTIVO: un riesgo ESG materializado congela la
+//     operación. El daño operativo estresa los días del ciclo (CxC e inventario
+//     suben, CxP baja), lo que infla el capital de trabajo neto y el CCC. El
+//     circulante del balance pasa a ser CxC + inventario reales (ya no un proxy).
 //
 //  Lógica del trade-off (todo honesto, sin ocultar costos):
 //   · CUMPLE  → invierte CAPEX: +activo fijo, +deuda, +depreciación, +intereses;
@@ -43,6 +47,10 @@ export interface PerfilFinanciero {
   tasa_interes: number;
   capex_pct_ingresos: number;  // CAPEX operativo normal (no el de cumplimiento)
   amortizacion_anios: number;  // plazo de amortización de la deuda (para el DSCR)
+  // Capital de trabajo — días del ciclo de conversión de efectivo (migración 32).
+  dias_cuentas_cobrar: number; // qué tan lento cobra el cliente
+  dias_inventario: number;     // qué tanto tarda el inventario en rotar
+  dias_cuentas_pagar: number;  // cuánto crédito comercial le dan sus proveedores
 }
 
 // Fallback = perfil GANADERÍA PyME (FIRA). Ya no es un placeholder inventado:
@@ -52,7 +60,14 @@ export interface PerfilFinanciero {
 export const PERFIL_BASE_AGRO_PLACEHOLDER: PerfilFinanciero = {
   ingresos_anuales: 50_000_000, margen_ebitda: 0.12, deuda_ebitda: 3.1,
   tasa_interes: 0.13, capex_pct_ingresos: 0.08, amortizacion_anios: 5,
+  dias_cuentas_cobrar: 45, dias_inventario: 120, dias_cuentas_pagar: 30, // ganadería PyME
 };
+
+// Estrés de capital de trabajo cuando un riesgo ESG se materializa: la operación
+// se congela. Escala con la pérdida de EBITDA (0 = sin daño, 1 = EBITDA base
+// entero perdido). A estrés pleno: clientes retienen pagos (+CxC), el inventario
+// no sale de bodega (+inventario), y los proveedores exigen contado (−CxP).
+export const WC_ESTRES = { cxc: 0.5, inventario: 0.6, cxp: 0.7 };
 
 export const INTENSIDAD_ESCENARIO_PLACEHOLDER = {
   cumple: 0.0, parcial: 0.30, incumple: 0.85,
@@ -79,10 +94,11 @@ export interface EstadoResultados {
 }
 export interface BalanceGeneral {
   activo_fijo: number;            // sube con el CAPEX de cumplimiento
-  otros_activos: number;
+  otros_activos: number;          // circulante operativo: cuentas por cobrar + inventario
   activo_total: number;
-  deuda: number;                  // sube con el financiamiento del CAPEX
-  capital: number;                // baja con pérdidas / aporte 25% del CAPEX
+  deuda: number;                  // deuda FINANCIERA (sube con el financiamiento del CAPEX)
+  cuentas_por_pagar: number;      // crédito comercial de proveedores (se contrae con el daño ESG)
+  capital: number;                // plug: activo_total − (deuda + cuentas_por_pagar)
   pasivo_capital_total: number;
 }
 export interface FlujoEfectivo {
@@ -97,6 +113,8 @@ export interface Indicadores {
   margen_operativo: number;
   dscr: number | null;            // (EBITDA − impuestos aprox) / (principal + intereses)
   requiere_fega: boolean;         // DSCR bajo el mínimo bancable (~1.20x)
+  ciclo_conversion_efectivo: number; // días: inventario + CxC − CxP (con estrés por daño ESG)
+  capital_trabajo_neto: number;      // MXN inmovilizados en el ciclo: (CxC + inventario) − CxP
 }
 export interface ResultadoVista {
   vista: Vista;
@@ -140,8 +158,9 @@ function construirVista(
   const ebitda = ebitdaBase - impactoOperativo;
 
   // CAPEX de cumplimiento: 75% deuda, 25% capital; se deprecia a 10 años.
+  // El 25% de capital propio no se contabiliza aparte: el capital del balance
+  // es el plug (Activo − Pasivo), así que el aporte queda implícito ahí.
   const deudaNueva = capexCumplimiento * CAPEX_PARAMS.pct_deuda;
-  const aporteCapital = capexCumplimiento * CAPEX_PARAMS.pct_capital;
   const deprecCapex = capexCumplimiento / CAPEX_PARAMS.anios_depreciacion;
 
   // Depreciación base (del CAPEX operativo normal) + la del CAPEX de cumplimiento.
@@ -162,25 +181,42 @@ function construirVista(
     utilidad_neta: Math.round(utilidadNeta),
   };
 
+  // --- Capital de trabajo (ciclo de conversión de efectivo) ---
+  // Un riesgo ESG materializado congela la operación. El estrés escala con la
+  // fracción de EBITDA base que se perdió por el daño operativo.
+  const stressWC = ebitdaBase > 0 ? Math.min(1, Math.max(0, impactoOperativo / ebitdaBase)) : 0;
+  const diasCxC = perfil.dias_cuentas_cobrar * (1 + WC_ESTRES.cxc * stressWC);
+  const diasInv = perfil.dias_inventario * (1 + WC_ESTRES.inventario * stressWC);
+  const diasCxP = Math.max(0, perfil.dias_cuentas_pagar * (1 - WC_ESTRES.cxp * stressWC));
+
+  // Costos operativos (COGS + OPEX antes de depreciación) ≈ ingresos − EBITDA base.
+  const costosOperativos = Math.max(0, ingresos - ebitdaBase);
+  const cuentasPorCobrar = (ingresos / 365) * diasCxC;
+  const inventario = (costosOperativos / 365) * diasInv;
+  const cuentasPorPagar = (costosOperativos / 365) * diasCxP;
+
+  const ccc = diasInv + diasCxC - diasCxP;
+  const capitalTrabajoNeto = (cuentasPorCobrar + inventario) - cuentasPorPagar;
+
   // --- Balance General ---
   // Activo fijo base (aprox = deuda base como proxy de capital instalado) + CAPEX.
   const activoFijoBase = deudaBase; // simplificación: activo instalado ~ deuda base
-  // Circulante (proxy). La MULTA sale de caja → reduce este activo, además de
-  // erosionar capital. Así el balance cuadra (Activo = Pasivo + Capital):
-  // la multa baja AMBOS lados (sale caja, se registra la pérdida).
-  const otrosActivos = ebitdaBase * 0.5 - multa;
+  // Circulante operativo real (CxC + inventario). La MULTA sale de caja → lo erosiona.
+  const otrosActivos = (cuentasPorCobrar + inventario) - multa;
   const activoFijo = activoFijoBase + capexCumplimiento;
   const activoTotal = activoFijo + otrosActivos;
-  // Capital = capital base + aporte propio del CAPEX (25%) − pérdida por multa.
-  const capitalBase = (activoFijoBase + ebitdaBase * 0.5) - deudaBase;
-  const capital = capitalBase + aporteCapital - multa;
+  // Pasivo = deuda financiera + proveedores (crédito comercial). Capital = plug,
+  // así el balance cuadra por construcción (Activo = Pasivo + Capital).
+  const pasivoTotal = deudaTotal + cuentasPorPagar;
+  const capitalRaw = activoTotal - pasivoTotal;
   const balance: BalanceGeneral = {
     activo_fijo: Math.round(activoFijo),
     otros_activos: Math.round(otrosActivos),
     activo_total: Math.round(activoTotal),
     deuda: Math.round(deudaTotal),
-    capital: Math.round(capital),
-    pasivo_capital_total: Math.round(deudaTotal + capital),
+    cuentas_por_pagar: Math.round(cuentasPorPagar),
+    capital: Math.round(capitalRaw),
+    pasivo_capital_total: Math.round(pasivoTotal + capitalRaw), // ≡ Math.round(activoTotal)
   };
 
   // --- Flujo de Efectivo (seccionado) ---
@@ -231,6 +267,8 @@ function construirVista(
     dscr,
     // requiere FEGA si el DSCR cae bajo el umbral bancable (y es calculable).
     requiere_fega: dscr !== null && dscr < UMBRAL_FEGA,
+    ciclo_conversion_efectivo: Math.round(ccc),
+    capital_trabajo_neto: Math.round(capitalTrabajoNeto),
   };
 
   return {
@@ -328,6 +366,7 @@ export function simularV2(
       coef_materialidad: "supuesto",
       capex_cumplimiento: "derivado_consecuencia_no_cubierta_60pct",
       financiamiento_capex: "supuesto_75_25",
+      capital_trabajo: "dias_cxc_inv_cxp_estresados_por_dano_esg",
       perfil_base: "placeholder",
       intensidad_escenario: "placeholder",
     },
