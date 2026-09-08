@@ -160,6 +160,13 @@ export interface ExportarInformeArgs {
    * aún no cargó o falló — la sección simplemente no se incluye.
    */
   simulacionFinanciera?: SimulacionFinanciera | null;
+  /**
+   * Resumen ejecutivo IA ya generado en pantalla. En una evaluación recién
+   * creada `resultado.resumen_ejecutivo` aún es null (se genera en cliente),
+   * así que hay que pasarlo aparte para que salga en el PDF.
+   */
+  resumenEjecutivo?: string | null;
+  resumenGeneradoEn?: string | null;
 }
 
 export function exportarInformePdf({
@@ -169,6 +176,8 @@ export function exportarInformePdf({
   resultado,
   contextoRiesgo,
   simulacionFinanciera,
+  resumenEjecutivo,
+  resumenGeneradoEn,
 }: ExportarInformeArgs): void {
   const doc = new jsPDF({ unit: 'mm', format: 'letter' });
   const ahoraIso = new Date().toISOString();
@@ -225,7 +234,9 @@ export function exportarInformePdf({
   y += selloBoxH + 8;
 
   // ---- Resumen ejecutivo (IA) — lo primero que lee el comité -----------
-  if (resultado.resumen_ejecutivo && resultado.resumen_ejecutivo.trim()) {
+  const resumenTexto = resumenEjecutivo ?? resultado.resumen_ejecutivo ?? null;
+  const resumenFecha = resumenGeneradoEn ?? resultado.resumen_generado_en ?? null;
+  if (resumenTexto && resumenTexto.trim()) {
     y = ensureSpace(doc, y, 26);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(11);
@@ -238,7 +249,7 @@ export function exportarInformePdf({
     doc.text('Generado por IA: traduce el análisis del modelo determinista a prosa. No calcula ni altera ninguna cifra.', MARGIN, y);
     y += 6;
 
-    for (const s of parseResumenPdf(resultado.resumen_ejecutivo)) {
+    for (const s of parseResumenPdf(resumenTexto)) {
       if (s.encabezado) {
         y = ensureSpace(doc, y, 12);
         doc.setFont('helvetica', 'bold');
@@ -256,11 +267,11 @@ export function exportarInformePdf({
       y += lineas.length * 4.2 + 4;
     }
 
-    if (resultado.resumen_generado_en) {
+    if (resumenFecha) {
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(7.5);
       doc.setTextColor(TEXT_TERTIARY);
-      doc.text(`Generado el ${fechaLarga(resultado.resumen_generado_en)}`, MARGIN, y);
+      doc.text(`Generado el ${fechaLarga(resumenFecha)}`, MARGIN, y);
       y += 6;
     }
     y += 2;

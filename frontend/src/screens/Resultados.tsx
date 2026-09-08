@@ -557,7 +557,16 @@ export function Resultados({
               variant="ghost"
               size="m"
               onClick={() =>
-                exportarInformePdf({ cliente, sectorNombre, jurisdiccionNombre, resultado, contextoRiesgo, simulacionFinanciera: simulacionParaPdf })
+                exportarInformePdf({
+                  cliente,
+                  sectorNombre,
+                  jurisdiccionNombre,
+                  resultado,
+                  contextoRiesgo,
+                  simulacionFinanciera: simulacionParaPdf,
+                  resumenEjecutivo: resumen,
+                  resumenGeneradoEn: resumenEn,
+                })
               }
             >
               Exportar informe (PDF)
