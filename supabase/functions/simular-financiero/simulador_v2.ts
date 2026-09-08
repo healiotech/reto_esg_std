@@ -17,7 +17,10 @@
 //   · CICLO DE CONVERSIÓN DE EFECTIVO: un riesgo ESG materializado congela la
 //     operación. El daño operativo estresa los días del ciclo (CxC e inventario
 //     suben, CxP baja), lo que infla el capital de trabajo neto y el CCC. El
-//     circulante del balance pasa a ser CxC + inventario reales (ya no un proxy).
+//     circulante del balance pasa a ser CxC + inventario reales (ya no un proxy),
+//     y una CAJA cuadra el balance: recoge el efectivo que el ciclo libera
+//     (Cumple) o consume (estrés, puede ser negativa = giro revolvente). Así el
+//     capital contable ya no se mueve solo por variar el capital de trabajo.
 //
 //  Lógica del trade-off (todo honesto, sin ocultar costos):
 //   · CUMPLE  → invierte CAPEX: +activo fijo, +deuda, +depreciación, +intereses;
@@ -95,10 +98,11 @@ export interface EstadoResultados {
 export interface BalanceGeneral {
   activo_fijo: number;            // sube con el CAPEX de cumplimiento
   otros_activos: number;          // circulante operativo: cuentas por cobrar + inventario
+  caja: number;                   // partida que cuadra: efectivo que el ciclo libera (+) o consume (−, giro revolvente)
   activo_total: number;
   deuda: number;                  // deuda FINANCIERA (sube con el financiamiento del CAPEX)
   cuentas_por_pagar: number;      // crédito comercial de proveedores (se contrae con el daño ESG)
-  capital: number;                // plug: activo_total − (deuda + cuentas_por_pagar)
+  capital: number;                // primeros principios: CTN base + aporte 25% del CAPEX − multa
   pasivo_capital_total: number;
 }
 export interface FlujoEfectivo {
@@ -164,10 +168,10 @@ function construirVista(
   // negativo es información honesta (pérdida operativa), no un error a ocultar.
   const ebitda = ebitdaBase - impactoOperativo;
 
-  // CAPEX de cumplimiento: 75% deuda, 25% capital; se deprecia a 10 años.
-  // El 25% de capital propio no se contabiliza aparte: el capital del balance
-  // es el plug (Activo − Pasivo), así que el aporte queda implícito ahí.
+  // CAPEX de cumplimiento: 75% deuda, 25% aporte de capital propio; se deprecia
+  // a 10 años. El aporte de capital sí se contabiliza (suma al patrimonio).
   const deudaNueva = capexCumplimiento * CAPEX_PARAMS.pct_deuda;
+  const aporteCapital = capexCumplimiento * CAPEX_PARAMS.pct_capital;
   const deprecCapex = capexCumplimiento / CAPEX_PARAMS.anios_depreciacion;
 
   // Depreciación base (del CAPEX operativo normal) + la del CAPEX de cumplimiento.
@@ -205,25 +209,40 @@ function construirVista(
   const ccc = diasInv + diasCxC - diasCxP;
   const capitalTrabajoNeto = (cuentasPorCobrar + inventario) - cuentasPorPagar;
 
+  // Capital de trabajo neto SIN estrés (días del perfil). Es el ancla del capital
+  // contable: en este modelo simplificado la deuda financia el activo fijo y el
+  // patrimonio financia el ciclo, así que capital base = CTN base.
+  const ctnBase =
+    (ingresos / 365) * perfil.dias_cuentas_cobrar +
+    (costosOperativos / 365) * perfil.dias_inventario -
+    (costosOperativos / 365) * perfil.dias_cuentas_pagar;
+
   // --- Balance General ---
   // Activo fijo base (aprox = deuda base como proxy de capital instalado) + CAPEX.
   const activoFijoBase = deudaBase; // simplificación: activo instalado ~ deuda base
-  // Circulante operativo real (CxC + inventario). La MULTA sale de caja → lo erosiona.
-  const otrosActivos = (cuentasPorCobrar + inventario) - multa;
   const activoFijo = activoFijoBase + capexCumplimiento;
-  const activoTotal = activoFijo + otrosActivos;
-  // Pasivo = deuda financiera + proveedores (crédito comercial). Capital = plug,
-  // así el balance cuadra por construcción (Activo = Pasivo + Capital).
-  const pasivoTotal = deudaTotal + cuentasPorPagar;
-  const capitalRaw = activoTotal - pasivoTotal;
+  const circulanteOperativo = cuentasPorCobrar + inventario; // CxC + inventario (con estrés)
+
+  // Capital DESDE PRIMEROS PRINCIPIOS (ya no es el plug): base + aporte propio
+  // del CAPEX (25%) − multa (pérdida que golpea el patrimonio). Así no cae solo
+  // porque el ciclo liberó capital de trabajo.
+  const capital = ctnBase + aporteCapital - multa;
+
+  // Caja: la partida que cuadra el balance. Absorbe el efectivo que el ciclo
+  // LIBERA (Cumple: menos días → el inventario se vuelve caja) o CONSUME (estrés:
+  // más días inmovilizan caja; puede volverse negativa = giro de línea revolvente).
+  const caja = (deudaTotal + cuentasPorPagar + capital) - (activoFijo + circulanteOperativo);
+  const activoTotal = activoFijo + circulanteOperativo + caja;
+
   const balance: BalanceGeneral = {
     activo_fijo: Math.round(activoFijo),
-    otros_activos: Math.round(otrosActivos),
+    otros_activos: Math.round(circulanteOperativo),
+    caja: Math.round(caja),
     activo_total: Math.round(activoTotal),
     deuda: Math.round(deudaTotal),
     cuentas_por_pagar: Math.round(cuentasPorPagar),
-    capital: Math.round(capitalRaw),
-    pasivo_capital_total: Math.round(pasivoTotal + capitalRaw), // ≡ Math.round(activoTotal)
+    capital: Math.round(capital),
+    pasivo_capital_total: Math.round(deudaTotal + cuentasPorPagar + capital), // ≡ Math.round(activoTotal)
   };
 
   // --- Flujo de Efectivo (seccionado) ---
@@ -514,7 +533,7 @@ export interface Spread {
   nota: string;                    // racional / mensaje de alcance
 }
 
-const TIIE_FONDEO = 6.75; // TIIE fondeo vigente (%). Editable si cambia.
+const TIIE_FONDEO = 6.5; // TIIE fondeo vigente (%). Editable si cambia.
 const UMBRAL_BANCABLE_SPREAD = 1.20;
 const SPREAD_BURSATIL_PB = 150; // referencia quirografaria para emisor bursátil (no scorecard FIRA)
 

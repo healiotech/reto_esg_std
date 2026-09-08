@@ -425,3 +425,41 @@ button:active {
 .resultados-root .ds-rise {
   animation: ds-rise var(--duration-base) var(--ease-standard) both;
 }
+
+/* ── Skeleton de carga ─────────────────────────────────────────────────────
+   Barra placeholder con barrido continuo. `linear` a propósito: un loop
+   infinito con ease se ve entrecortado; la regla de ease-out es para
+   entradas/salidas, no para un barrido perpetuo. reduced-motion (arriba) lo
+   deja estático, y sigue leyéndose como placeholder por el tinte. */
+@keyframes ds-shimmer {
+  from { background-position: 150% 0; }
+  to { background-position: -50% 0; }
+}
+.ds-skeleton {
+  border-radius: 3px;
+  background: linear-gradient(
+    90deg,
+    var(--doc-paper-tint) 20%,
+    var(--doc-paper-sunk) 45%,
+    var(--doc-paper-tint) 70%
+  );
+  background-size: 200% 100%;
+  animation: ds-shimmer 1.5s linear infinite;
+}
+
+/* ── Sello "generado por IA" ───────────────────────────────────────────────
+   Franja compacta en rojo de marca (anclaje institucional, no alarma) con un
+   destello diagonal que la recorre: señala que hay un proceso vivo detrás sin
+   depender de un spinner. Anima transform, no propiedades de layout. */
+@keyframes ds-sheen {
+  from { transform: translateX(-160%) skewX(-18deg); }
+  to { transform: translateX(160%) skewX(-18deg); }
+}
+.ds-sello__sheen {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 45%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.28), transparent);
+  animation: ds-sheen 2.6s var(--ease-standard) infinite;
+  pointer-events: none;
+}

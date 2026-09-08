@@ -97,14 +97,54 @@ function vistaDe(sim: SimulacionFinanciera, vista: VistaSimulada): VistaFinancie
   return sim.escenarios.find((e) => e.vista === vista) ?? sim.escenarios[0];
 }
 
-// "Actual" es la referencia de comparación para los tres escenarios
-// hipotéticos (no hay un "base" fijo aparte, como en v1). null = indefinido
-// (EBITDA llegó a 0) y se trata como "lo peor posible".
-function esPeorQueActual(valor: number | null, actual: number | null, peorEsMayor: boolean): boolean {
-  if (valor === null) return true;
-  if (actual === null) return false;
-  const tolerancia = Math.abs(actual) * 0.001 + 1e-9;
-  return peorEsMayor ? valor - actual > tolerancia : valor - actual < -tolerancia;
+// "Actual" es la referencia de comparación para los tres escenarios hipotéticos
+// (no hay un "base" fijo aparte, como en v1).
+//
+// Chip de variación vs. Actual. El signo es el cambio matemático real (+ sube,
+// − baja); el COLOR es semáforo financiero, no el signo: verde tenue si el
+// cambio es favorable, rojo quemado si es adverso. `peorEsMayor` dice de qué
+// lado está lo malo (p. ej. Deuda/EBITDA: más es peor, así que bajar es verde;
+// Cobertura o DSCR: más es mejor, así que subir es verde).
+function DeltaChip({
+  delta,
+  formato,
+  peorEsMayor,
+  size = 'lg',
+}: {
+  delta: number;
+  formato: (n: number) => string;
+  peorEsMayor: boolean;
+  size?: 'lg' | 'sm';
+}) {
+  if (delta === 0) return null;
+  const sube = delta > 0;
+  const favorable = peorEsMayor ? !sube : sube;
+  const color = favorable ? 'var(--ok-fg)' : 'var(--risk-critico)';
+  const signo = sube ? '+' : '−';
+  if (size === 'sm') {
+    return (
+      <span className="font-semibold tabular-nums text-[12px]" style={{ color }}>
+        {signo}
+        {formato(Math.abs(delta))}
+      </span>
+    );
+  }
+  return (
+    <span className="ds-figure" style={{ fontSize: 'var(--figure-m)', color }}>
+      {signo}
+      {formato(Math.abs(delta))}
+    </span>
+  );
+}
+
+// "Actual: X" en la esquina superior derecha de una card (solo cuando la vista
+// es un escenario). Tinta media, discreta.
+function EsquinaActual({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="tabular-nums text-[11px]" style={{ color: 'var(--doc-ink-700)' }}>
+      Actual: {children}
+    </span>
+  );
 }
 
 interface PerfilFormState {
@@ -1265,7 +1305,6 @@ function SimuladorFinanciero({
                 valorActual={actual.indicadores.deuda_ebitda}
                 esActual={esActual}
                 peorEsMayor
-                color={color}
               />
               <IndicadorDestacado
                 label="Cobertura de intereses"
@@ -1273,7 +1312,6 @@ function SimuladorFinanciero({
                 valorActual={actual.indicadores.cobertura_intereses}
                 esActual={esActual}
                 peorEsMayor={false}
-                color={color}
               />
               <IndicadorDestacado
                 label="DSCR (servicio de deuda)"
@@ -1281,7 +1319,6 @@ function SimuladorFinanciero({
                 valorActual={actual.indicadores.dscr}
                 esActual={esActual}
                 peorEsMayor={false}
-                color={color}
                 umbral={DSCR_UMBRAL}
                 umbralNota={`Mín. bancable ${DSCR_UMBRAL.toFixed(2)}x`}
                 formato={(n) => (typeof n === 'number' && Number.isFinite(n) ? `${n.toFixed(2)}x` : '—')}
@@ -1297,36 +1334,75 @@ function SimuladorFinanciero({
               Ciclo de conversión de efectivo
             </div>
 
-            {/* Desglose: los componentes que arman el CCC y el capital de trabajo. */}
-            <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2">
-              <MiniDato label="Días de cobro" valor={`${vistaActiva.indicadores.dias_cobro} d`} />
-              <MiniDato label="Días de inventario" valor={`${vistaActiva.indicadores.dias_inventario} d`} />
-              <MiniDato label="Días de pago" valor={`${vistaActiva.indicadores.dias_pago} d`} />
-              <MiniDato label="Cuentas por cobrar" valor={formatPesos(vistaActiva.indicadores.cuentas_por_cobrar)} />
-              <MiniDato label="Inventario" valor={formatPesos(vistaActiva.indicadores.inventario_valor)} />
-              <MiniDato label="Cuentas por pagar" valor={formatPesos(vistaActiva.indicadores.cuentas_por_pagar)} />
-            </div>
-
+            {/* Un solo bloque cuadriculado: arriba el desglose (días y montos que
+                arman el ciclo), abajo los dos totales. El separador de 1px entre
+                sub-grids viene del gap del contenedor. */}
             <div
-              className="grid grid-cols-1 sm:grid-cols-2 mt-3"
+              className="flex flex-col mt-3"
               style={{ gap: '1px', background: 'var(--doc-rule)', border: '1px solid var(--doc-rule)', borderRadius: 'var(--radius-control)', overflow: 'clip' }}
             >
-              <MetricaCiclo
-                label="Días de ciclo (CCC)"
-                valor={vistaActiva.indicadores.ciclo_conversion_efectivo}
-                valorActual={actual.indicadores.ciclo_conversion_efectivo}
-                esActual={esActual}
-                color={color}
-                formato={(n) => `${n} días`}
-              />
-              <MetricaCiclo
-                label="Capital de trabajo neto"
-                valor={vistaActiva.indicadores.capital_trabajo_neto}
-                valorActual={actual.indicadores.capital_trabajo_neto}
-                esActual={esActual}
-                color={color}
-                formato={formatPesos}
-              />
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6" style={{ gap: '1px', background: 'var(--doc-rule)' }}>
+                <MiniDato
+                  label="DDC"
+                  valor={vistaActiva.indicadores.dias_cobro}
+                  valorActual={actual.indicadores.dias_cobro}
+                  esActual={esActual}
+                  formato={String}
+                />
+                <MiniDato
+                  label="DDI"
+                  valor={vistaActiva.indicadores.dias_inventario}
+                  valorActual={actual.indicadores.dias_inventario}
+                  esActual={esActual}
+                  formato={String}
+                />
+                <MiniDato
+                  label="DDP"
+                  valor={vistaActiva.indicadores.dias_pago}
+                  valorActual={actual.indicadores.dias_pago}
+                  esActual={esActual}
+                  formato={String}
+                  peorEsMayor={false}
+                />
+                <MiniDato
+                  label="CXC"
+                  valor={vistaActiva.indicadores.cuentas_por_cobrar}
+                  valorActual={actual.indicadores.cuentas_por_cobrar}
+                  esActual={esActual}
+                  formato={formatPesos}
+                />
+                <MiniDato
+                  label="INV"
+                  valor={vistaActiva.indicadores.inventario_valor}
+                  valorActual={actual.indicadores.inventario_valor}
+                  esActual={esActual}
+                  formato={formatPesos}
+                />
+                <MiniDato
+                  label="CXP"
+                  valor={vistaActiva.indicadores.cuentas_por_pagar}
+                  valorActual={actual.indicadores.cuentas_por_pagar}
+                  esActual={esActual}
+                  formato={formatPesos}
+                  peorEsMayor={false}
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2" style={{ gap: '1px', background: 'var(--doc-rule)' }}>
+                <MetricaCiclo
+                  label="Ciclo de Conversión de Efectivo"
+                  valor={vistaActiva.indicadores.ciclo_conversion_efectivo}
+                  valorActual={actual.indicadores.ciclo_conversion_efectivo}
+                  esActual={esActual}
+                  formato={(n) => `${n} días`}
+                />
+                <MetricaCiclo
+                  label="Capital de trabajo neto"
+                  valor={vistaActiva.indicadores.capital_trabajo_neto}
+                  valorActual={actual.indicadores.capital_trabajo_neto}
+                  esActual={esActual}
+                  formato={formatPesos}
+                />
+              </div>
             </div>
             <p className="m-0 mt-2 text-[11px] leading-relaxed" style={{ color: 'var(--doc-ink-500)' }}>
               Más días y más capital inmovilizado = más caja atrapada en la operación, presión de liquidez que no aparece
@@ -1396,6 +1472,12 @@ function SimuladorFinanciero({
                   label="Circulante operativo"
                   actual={actual.balance.otros_activos}
                   escenario={esActual ? undefined : vistaActiva.balance.otros_activos}
+                />
+                <LineaEF
+                  label="Caja"
+                  actual={actual.balance.caja}
+                  escenario={esActual ? undefined : vistaActiva.balance.caja}
+                  alertaSiNegativo
                 />
                 <LineaEF
                   label="Activo total"
@@ -1626,7 +1708,7 @@ function CostoDelCredito({
         Costo del crédito
       </div>
 
-      <div className="flex flex-col sm:flex-row sm:items-start gap-y-3 sm:gap-x-8 mt-3">
+      <div className="flex sm:flex-row flex-col sm:items-start gap-y-3 sm:gap-x-8 mt-3">
         <div className="min-w-0">
           <div className="ds-figure" style={{ fontSize: 'var(--figure-xl)', color: 'var(--doc-ink-900)' }}>
             TIIE + {spreadPct}%
@@ -1639,7 +1721,7 @@ function CostoDelCredito({
           <span className="inline-flex items-center gap-2">
             {!esBursatil && (
               <span
-                className="inline-flex items-center justify-center font-bold text-[13px]"
+                className="inline-flex justify-center items-center font-bold text-[13px]"
                 style={{ width: 26, height: 26, background: `${cat.hex}1f`, color: cat.hex, borderRadius: 'var(--radius-control)' }}
               >
                 {spread.categoria}
@@ -1687,7 +1769,6 @@ function IndicadorDestacado({
   valorActual,
   esActual,
   peorEsMayor,
-  color,
   umbral,
   umbralNota,
   formato = formatVeces,
@@ -1696,8 +1777,8 @@ function IndicadorDestacado({
   valor: number | null;
   valorActual: number | null;
   esActual: boolean;
+  /** Sentido del umbral: `true` = un valor mayor es el que cruza a "bajo umbral". */
   peorEsMayor: boolean;
-  color: string;
   /** Umbral de referencia (p. ej. DSCR bancable 1.20x). Cambia el color: bajo el umbral → alerta, sobre → verde. */
   umbral?: number;
   umbralNota?: string;
@@ -1706,7 +1787,6 @@ function IndicadorDestacado({
 }) {
   const nulo = valor === null;
   const negativo = valor !== null && valor < 0;
-  const empeoro = !esActual && !negativo && esPeorQueActual(valor, valorActual, peorEsMayor);
   const bajoUmbral =
     umbral != null && valor !== null && !negativo && (peorEsMayor ? valor > umbral : valor < umbral);
   const sobreUmbral = umbral != null && valor !== null && !negativo && !bajoUmbral;
@@ -1718,14 +1798,19 @@ function IndicadorDestacado({
         ? 'var(--warn-fg)'
         : sobreUmbral
           ? 'var(--ok-fg)'
-          : empeoro
-            ? color
-            : 'var(--doc-ink-900)';
+          : 'var(--doc-ink-900)';
+  const comparar = !esActual && !nulo && !negativo && valorActual !== null;
   return (
     <div className="p-4" style={{ background: 'var(--doc-paper)' }}>
-      <div className="ds-eyebrow">{label}</div>
-      <div className="mt-2 ds-figure" style={{ fontSize: 'var(--figure-xl)', color: valorColor }}>
-        {formato(valor)}
+      <div className="flex justify-between items-start gap-2">
+        <div className="ds-eyebrow">{label}</div>
+        {comparar && <EsquinaActual>{formato(valorActual)}</EsquinaActual>}
+      </div>
+      <div className="flex items-baseline gap-2 mt-2">
+        <span className="ds-figure" style={{ fontSize: 'var(--figure-xl)', color: valorColor }}>
+          {formato(valor)}
+        </span>
+        {comparar && <DeltaChip delta={valor! - valorActual!} formato={(n) => formato(n)} peorEsMayor={peorEsMayor} />}
       </div>
       {umbral != null && umbralNota && !nulo && !negativo && (
         <div className="mt-1.5 text-[11px]" style={{ color: bajoUmbral ? 'var(--warn-fg)' : 'var(--doc-ink-500)' }}>
@@ -1742,63 +1827,79 @@ function IndicadorDestacado({
           EBITDA negativo: pérdida operativa
         </div>
       )}
-      {!esActual && !nulo && !negativo && (
-        <div className="mt-1.5 tabular-nums text-[11px]" style={{ color: 'var(--doc-ink-500)' }}>
-          Actual: {formato(valorActual)}
-        </div>
-      )}
     </div>
   );
 }
 
-// Dato de contexto minúsculo (label arriba, valor debajo). Para el desglose del
-// ciclo de efectivo: días de cobro/inventario/pago y los montos de CxC/inv/CxP.
-function MiniDato({ label, valor }: { label: string; valor: string }) {
+// Celda de contexto del desglose del ciclo de efectivo (días de
+// cobro/inventario/pago y montos de CxC/inv/CxP). Comparte el tratamiento de
+// celda cuadriculada del resto de la sección; padding más chico que los totales
+// de abajo para marcar la jerarquía "componentes → total". Compacta: "Actual" en
+// la esquina y chip de variación por signo, igual que las cards grandes.
+function MiniDato({
+  label,
+  valor,
+  valorActual,
+  esActual,
+  formato,
+  peorEsMayor = true,
+}: {
+  label: string;
+  valor: number;
+  valorActual: number;
+  esActual: boolean;
+  formato: (n: number) => string;
+  /** `false` para métricas donde MÁS es mejor (días/cuentas por pagar). */
+  peorEsMayor?: boolean;
+}) {
   return (
-    <div>
-      <div className="ds-eyebrow" style={{ fontSize: '0.5625rem' }}>
-        {label}
+    <div className="px-3 py-2.5" style={{ background: 'var(--doc-paper)' }}>
+      <div className="flex flex-wrap justify-between items-start gap-x-2">
+        <div className="ds-eyebrow" style={{ fontSize: '0.5625rem' }}>
+          {label}
+        </div>
+        {!esActual && <EsquinaActual>{formato(valorActual)}</EsquinaActual>}
       </div>
-      <div className="mt-0.5 tabular-nums font-semibold text-[13px]" style={{ color: 'var(--doc-ink-900)' }}>
-        {valor}
+      <div className="flex items-baseline gap-1.5 mt-1">
+        <span className="font-semibold tabular-nums text-[13px]" style={{ color: 'var(--doc-ink-900)' }}>
+          {formato(valor)}
+        </span>
+        {!esActual && (
+          <DeltaChip delta={valor - valorActual} formato={formato} peorEsMayor={peorEsMayor} size="sm" />
+        )}
       </div>
     </div>
   );
 }
 
 // Métrica del ciclo de efectivo (CCC en días, capital de trabajo neto en MXN).
-// A diferencia de IndicadorDestacado no tiene lógica de EBITDA nulo/negativo:
-// para estas dos, "más" siempre es peor (más caja atrapada en la operación).
+// A diferencia de IndicadorDestacado no tiene lógica de EBITDA nulo/negativo.
+// En ambas, MENOS es mejor (menos caja atrapada), así que bajar sale verde.
 function MetricaCiclo({
   label,
   valor,
   valorActual,
   esActual,
-  color,
   formato,
 }: {
   label: string;
   valor: number;
   valorActual: number;
   esActual: boolean;
-  color: string;
   formato: (n: number) => string;
 }) {
-  const empeoro = !esActual && valor > valorActual;
   return (
     <div className="p-4" style={{ background: 'var(--doc-paper)' }}>
-      <div className="ds-eyebrow">{label}</div>
-      <div
-        className="mt-2 ds-figure"
-        style={{ fontSize: 'var(--figure-xl)', color: empeoro ? color : 'var(--doc-ink-900)' }}
-      >
-        {formato(valor)}
+      <div className="flex justify-between items-start gap-2">
+        <div className="ds-eyebrow">{label}</div>
+        {!esActual && <EsquinaActual>{formato(valorActual)}</EsquinaActual>}
       </div>
-      {!esActual && (
-        <div className="mt-1.5 tabular-nums text-[11px]" style={{ color: 'var(--doc-ink-500)' }}>
-          Actual: {formato(valorActual)}
-        </div>
-      )}
+      <div className="flex items-baseline gap-2 mt-2">
+        <span className="ds-figure" style={{ fontSize: 'var(--figure-xl)', color: 'var(--doc-ink-900)' }}>
+          {formato(valor)}
+        </span>
+        {!esActual && <DeltaChip delta={valor - valorActual} formato={formato} peorEsMayor />}
+      </div>
     </div>
   );
 }
@@ -1968,6 +2069,68 @@ function parseResumen(texto: string): { encabezado: string; cuerpo: string }[] {
   return out;
 }
 
+// Sello de origen IA. Franja compacta en rojo de marca (anclaje institucional,
+// no alarma) con un destello que la recorre: deja claro que hay un modelo
+// detrás sin depender de un spinner. Presente en todos los estados del bloque.
+function SelloIA() {
+  return (
+    <div
+      className="relative flex items-center gap-2 mb-4 px-3 py-2 overflow-hidden"
+      style={{ background: 'linear-gradient(100deg, #ec0000 0%, #990000 100%)', borderRadius: 'var(--radius-control)' }}
+    >
+      <span className="ds-sello__sheen" aria-hidden="true" />
+      <svg
+        width="13"
+        height="13"
+        viewBox="0 0 20 20"
+        fill="none"
+        aria-hidden="true"
+        className="relative flex-shrink-0"
+        style={{ color: '#fff' }}
+      >
+        <path d="M10 2.5 11.7 7.3 16.5 9 11.7 10.7 10 15.5 8.3 10.7 3.5 9 8.3 7.3 10 2.5Z" fill="currentColor" />
+      </svg>
+      <span className="relative text-[11px] leading-snug" style={{ color: '#fff' }}>
+        <strong className="font-bold uppercase tracking-[0.06em]">Generado por IA</strong>
+        <span style={{ opacity: 0.85 }}> | Asistente de generación de reporte. No involucra cálculos.</span>
+      </span>
+    </div>
+  );
+}
+
+// Skeleton mientras se genera el resumen: reproduce el layout editorial real
+// (un título corto + líneas de párrafo por bloque) con barrido de shimmer, para
+// que se lea inequívocamente como "cargando" y no como contenido estático.
+function ResumenSkeleton() {
+  const anchoTitulo = [86, 72, 80, 60]; // % del ancho del título placeholder por bloque
+  return (
+    <div>
+      <div className="ds-panel">
+        <div className="p-5 sm:p-6">
+          {anchoTitulo.map((w, i) => (
+            <div key={i} className={i > 0 ? 'mt-5' : ''} aria-hidden="true">
+              <div className="ds-skeleton" style={{ height: 13, width: `${w}%`, maxWidth: 240 }} />
+              <div className="flex flex-col gap-2 mt-2.5">
+                <div className="ds-skeleton" style={{ height: 9, width: '100%' }} />
+                <div className="ds-skeleton" style={{ height: 9, width: '95%' }} />
+                <div className="ds-skeleton" style={{ height: 9, width: i % 2 ? '54%' : '73%' }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <p
+        className="m-0 mt-3 text-[12px]"
+        style={{ color: 'var(--doc-ink-500)' }}
+        role="status"
+        aria-live="polite"
+      >
+        Generando resumen ejecutivo… unos segundos (llamada a un modelo de IA).
+      </p>
+    </div>
+  );
+}
+
 // Bloque 0 — Resumen ejecutivo IA. Lo primero que lee el comité. Traduce el
 // análisis determinista a prosa; NO altera ningún número. Estados:
 // sin generar → generando → generado (+ regenerar) / error (no bloquea nada).
@@ -1992,25 +2155,7 @@ function ResumenEjecutivo({
         Resumen ejecutivo
       </ZonaHeader>
       <div className="px-[var(--pad-x)] pt-4 pb-6">
-        {/* Etiqueta de origen IA — discreta pero siempre presente. */}
-        <div
-          className="flex items-center gap-2 mb-4 px-3 py-1.5"
-          style={{ background: 'var(--ctx-100)', borderRadius: 'var(--radius-control)' }}
-        >
-          <svg
-            width="13"
-            height="13"
-            viewBox="0 0 20 20"
-            fill="none"
-            aria-hidden="true"
-            style={{ color: 'var(--ctx-500)', flexShrink: 0 }}
-          >
-            <path d="M10 2.5 11.7 7.3 16.5 9 11.7 10.7 10 15.5 8.3 10.7 3.5 9 8.3 7.3 10 2.5Z" fill="currentColor" />
-          </svg>
-          <span className="ds-eyebrow" style={{ color: 'var(--ctx-500)' }}>
-            Resumen generado por IA · traduce el análisis, no lo altera
-          </span>
-        </div>
+        <SelloIA />
 
         {error && (
           <div className="flex flex-col items-start gap-2">
@@ -2026,11 +2171,7 @@ function ResumenEjecutivo({
           </div>
         )}
 
-        {generando && (
-          <p className="m-0 text-[13px]" style={{ color: 'var(--doc-ink-500)' }}>
-            Generando resumen ejecutivo… tarda unos segundos (llamada a un modelo de IA).
-          </p>
-        )}
+        {generando && <ResumenSkeleton />}
 
         {!generando && !resumen && !error && (
           <div className="flex flex-col items-start gap-3">
@@ -2044,47 +2185,41 @@ function ResumenEjecutivo({
         )}
 
         {!generando && resumen && (
-          <>
-            {/* Un solo recuadro, prosa continua con subtítulos editoriales — no
-                sub-secciones con franjas. Se lee como el resumen que es. */}
-            <div className="ds-panel">
-              <div className="p-5 sm:p-6">
-                {secciones.length > 0 ? (
-                  secciones.map((s, i) => (
-                    <div key={s.encabezado} className={i > 0 ? 'mt-5' : ''}>
-                      <h3 className="ds-title m-0 text-[14px]" style={{ color: 'var(--doc-ink-900)' }}>
-                        {s.encabezado}
-                      </h3>
-                      <p className="m-0 mt-1.5 text-[13px] leading-relaxed" style={{ color: 'var(--doc-ink-700)' }}>
-                        {s.cuerpo}
-                      </p>
-                    </div>
-                  ))
-                ) : (
-                  <p
-                    className="m-0 text-[13px] leading-relaxed"
-                    style={{ color: 'var(--doc-ink-700)', whiteSpace: 'pre-wrap' }}
-                  >
-                    {resumen}
-                  </p>
-                )}
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-3 mt-3">
-              {resumenEn && (
-                <span className="text-[12px]" style={{ color: 'var(--doc-ink-500)' }}>
-                  Generado el{' '}
-                  {new Date(resumenEn).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })}
-                </span>
+          /* Un solo recuadro, prosa continua con subtítulos editoriales — no
+             sub-secciones con franjas. Se lee como el resumen que es. La fecha
+             de generación va como pie del propio recuadro. */
+          <div className="ds-panel">
+            <div className="p-5 sm:p-6">
+              {secciones.length > 0 ? (
+                secciones.map((s, i) => (
+                  <div key={s.encabezado} className={i > 0 ? 'mt-5' : ''}>
+                    <h3 className="m-0 text-[14px] ds-title" style={{ color: 'var(--doc-ink-900)' }}>
+                      {s.encabezado}
+                    </h3>
+                    <p className="m-0 mt-1.5 text-[13px] leading-relaxed" style={{ color: 'var(--doc-ink-700)' }}>
+                      {s.cuerpo}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <p
+                  className="m-0 text-[13px] leading-relaxed"
+                  style={{ color: 'var(--doc-ink-700)', whiteSpace: 'pre-wrap' }}
+                >
+                  {resumen}
+                </p>
               )}
-              <Button variant="ghost" size="s" onClick={onGenerar}>
-                Regenerar
-              </Button>
-              <span className="text-[11px]" style={{ color: 'var(--doc-ink-400)' }}>
-                Regenerar consume una nueva llamada de IA.
-              </span>
             </div>
-          </>
+            {resumenEn && (
+              <div
+                className="px-5 sm:px-6 py-2.5 text-[11px]"
+                style={{ borderTop: '1px solid var(--doc-rule)', color: 'var(--doc-ink-400)' }}
+              >
+                Generado el{' '}
+                {new Date(resumenEn).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })}
+              </div>
+            )}
+          </div>
         )}
       </div>
     </section>

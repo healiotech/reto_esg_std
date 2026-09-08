@@ -267,7 +267,7 @@ function TopVulnerabilidades({ resumen, className = '' }: { resumen: ResumenCart
       <div className="px-[var(--pad-x)] pb-5 pt-4">
         {top_temas.length === 0 ? (
           <p className="m-0 text-[13px]" style={{ color: 'var(--doc-ink-500)' }}>
-            Sin incumplimientos registrados en la cartera.
+            Sin temas en riesgo en la cartera (ninguna norma en no cumple, parcial o información faltante).
           </p>
         ) : (
           <ol className="m-0 flex list-none flex-col gap-3 p-0">

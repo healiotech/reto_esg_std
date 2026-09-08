@@ -137,8 +137,13 @@ Deno.serve(async (req) => {
       "Alto": { clientes: 0, exposicion_mxn: 0 },
       "Crítico": { clientes: 0, exposicion_mxn: 0 },
     };
-    // Tema ESG → set de cliente_id con al menos una norma de ese tema en no_cumple.
-    const temaNoCumpleClientes = new Map<string, Set<string>>();
+    // Tema ESG → set de cliente_id con al menos una norma de ese tema "en
+    // riesgo": no_cumple, parcial o desconocido (mismo criterio que
+    // "Dimensiones materiales en riesgo" de Resultados). Antes solo contaba
+    // no_cumple y el bloque salía vacío si la cartera no tenía incumplimientos
+    // duros, aunque hubiera cumplimiento parcial o información faltante.
+    const temaRiesgoClientes = new Map<string, Set<string>>();
+    const ESTATUS_EN_RIESGO = new Set(["no_cumple", "parcial", "desconocido"]);
     const pipeline = {
       viables: 0, con_greenium: 0, viables_reestructura: 0,
       requieren_fega: 0, no_bancables: 0, fuera_alcance: 0,
@@ -183,15 +188,15 @@ Deno.serve(async (req) => {
 
       const vrn = vrnPorEval.get((ev as any).id) ?? [];
 
-      // Top de incumplimientos POR TEMA: se lee de v_riesgo_norma (join en vivo
+      // Top de vulnerabilidades POR TEMA: se lee de v_riesgo_norma (join en vivo
       // con normas.tema), no del blob persistido, que en evaluaciones viejas no
       // trae `tema`. Un cliente cuenta una sola vez por tema.
       const clienteId: string = (ev as any).cliente_id;
       for (const d of vrn) {
-        if ((d as any).estatus === "no_cumple" && (d as any).tema) {
+        if (ESTATUS_EN_RIESGO.has((d as any).estatus) && (d as any).tema) {
           const t = (d as any).tema;
-          if (!temaNoCumpleClientes.has(t)) temaNoCumpleClientes.set(t, new Set());
-          temaNoCumpleClientes.get(t)!.add(clienteId);
+          if (!temaRiesgoClientes.has(t)) temaRiesgoClientes.set(t, new Set());
+          temaRiesgoClientes.get(t)!.add(clienteId);
         }
       }
 
@@ -232,7 +237,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    const topTemas = [...temaNoCumpleClientes.entries()]
+    const topTemas = [...temaRiesgoClientes.entries()]
       .map(([tema, set]) => ({ tema, n_clientes: set.size, materialidad: bandaPorTema.get(tema) ?? null }))
       .sort((a, b) => b.n_clientes - a.n_clientes)
       .slice(0, 3);

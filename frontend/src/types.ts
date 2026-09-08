@@ -223,6 +223,7 @@ export interface EstadoResultadosFinanciero {
 export interface BalanceGeneralFinanciero {
   activo_fijo: number;
   otros_activos: number; // circulante operativo: cuentas por cobrar + inventario
+  caja: number; // partida que cuadra: efectivo liberado (+) o consumido (−) por el ciclo
   activo_total: number;
   deuda: number; // deuda financiera (sin proveedores)
   cuentas_por_pagar: number; // crédito comercial de proveedores

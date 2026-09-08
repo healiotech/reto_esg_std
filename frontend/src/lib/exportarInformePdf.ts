@@ -39,7 +39,7 @@ const BANDA_COLOR: Record<CanalResultado['banda'], { bg: string; fg: string; str
 const CATEGORIA_LABEL: Record<Categoria, string> = {
   ambiental: 'Ambiental',
   social: 'Social',
-  jurisdiccional_documental: 'Documental / jurisdiccional',
+  jurisdiccional_documental: 'Gobernanza',
 };
 
 const ESTATUS_LABEL: Record<Estatus, string> = {
@@ -94,6 +94,46 @@ function multaTexto(fila: DetalleNorma): string | null {
     return `Sanción potencial: ${nota}`;
   }
   return null;
+}
+
+// Parsea el resumen ejecutivo de la IA ("**Encabezado** | cuerpo", bloques
+// separados por línea en blanco). Si el modelo no siguió el formato, devuelve
+// un único bloque sin encabezado con el texto crudo.
+function parseResumenPdf(texto: string): { encabezado: string; cuerpo: string }[] {
+  const re = /\*\*(.+?)\*\*\s*\|\s*([\s\S]*?)(?=\n\s*\*\*|\s*$)/g;
+  const out: { encabezado: string; cuerpo: string }[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(texto)) !== null) {
+    const cuerpo = m[2].trim().replace(/\s*\n\s*/g, ' ');
+    if (cuerpo) out.push({ encabezado: m[1].trim(), cuerpo });
+  }
+  return out.length > 0 ? out : [{ encabezado: '', cuerpo: texto.trim() }];
+}
+
+// Dictamen de bancabilidad (mismo criterio que DictamenBancabilidad en pantalla).
+function dictamenBancabilidad(
+  e: { bancable_base: boolean; dscr_base: number | null; reestructurable: boolean; plazo_optimo: number | null; dscr_optimo: number | null; deficit_flujo: number },
+  plazoBase: number,
+): { verdicto: string; razon: string } {
+  if (e.bancable_base) {
+    return {
+      verdicto: 'Bancable',
+      razon:
+        e.dscr_base != null
+          ? `El servicio de deuda queda cubierto con la estructura actual (DSCR ${e.dscr_base.toFixed(2)}x, plazo ${plazoBase} años). Sujeto de crédito sin garantía adicional.`
+          : 'El servicio de deuda queda cubierto con la estructura actual. Sujeto de crédito sin garantía adicional.',
+    };
+  }
+  if (e.reestructurable && e.plazo_optimo != null && e.dscr_optimo != null) {
+    return {
+      verdicto: 'Bancable con reestructura',
+      razon: `Ampliar el plazo de la deuda de ${plazoBase} a ${e.plazo_optimo} años eleva el DSCR a ${e.dscr_optimo.toFixed(2)}x y el crédito se vuelve viable.`,
+    };
+  }
+  return {
+    verdicto: 'Requiere garantía FEGA',
+    razon: `No alcanza el mínimo bancable ni reestructurando a 10 años. Faltan ${formatPesos(e.deficit_flujo)} de flujo anual para cubrir el servicio de deuda; requeriría respaldo de garantía FEGA de FIRA.`,
+  };
 }
 
 function flagsDeCanal(canal: CanalResultado): string[] {
@@ -183,6 +223,48 @@ export function exportarInformePdf({
   doc.text(selloSubLines, MARGIN + 6, y + 15);
 
   y += selloBoxH + 8;
+
+  // ---- Resumen ejecutivo (IA) — lo primero que lee el comité -----------
+  if (resultado.resumen_ejecutivo && resultado.resumen_ejecutivo.trim()) {
+    y = ensureSpace(doc, y, 26);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(TEXT_PRIMARY);
+    doc.text('Resumen ejecutivo', MARGIN, y);
+    y += 5;
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(8);
+    doc.setTextColor(TEXT_TERTIARY);
+    doc.text('Generado por IA: traduce el análisis del modelo determinista a prosa. No calcula ni altera ninguna cifra.', MARGIN, y);
+    y += 6;
+
+    for (const s of parseResumenPdf(resultado.resumen_ejecutivo)) {
+      if (s.encabezado) {
+        y = ensureSpace(doc, y, 12);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.setTextColor(TEXT_PRIMARY);
+        doc.text(s.encabezado, MARGIN, y);
+        y += 4.5;
+      }
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(TEXT_SECONDARY);
+      const lineas = doc.splitTextToSize(s.cuerpo, CONTENT_W) as string[];
+      y = ensureSpace(doc, y, lineas.length * 4.2 + 4);
+      doc.text(lineas, MARGIN, y);
+      y += lineas.length * 4.2 + 4;
+    }
+
+    if (resultado.resumen_generado_en) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(TEXT_TERTIARY);
+      doc.text(`Generado el ${fechaLarga(resultado.resumen_generado_en)}`, MARGIN, y);
+      y += 6;
+    }
+    y += 2;
+  }
 
   // ---- Datos del cliente ---------------------------------------------
   doc.setFont('helvetica', 'bold');
@@ -565,6 +647,121 @@ export function exportarInformePdf({
 
     const finalY = (doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY;
     y = (finalY ?? y) + 8;
+
+    // Helper: tabla comparativa Actual | Cumple | Parcial | Incumple.
+    const nextY = () => ((doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y) + 7;
+    const vistas4: (typeof actual | undefined)[] = [actual, cumpleE, parcialE, incumpleE];
+    const tablaVistas = (
+      titulo: string,
+      filas: [string, (v: typeof actual) => string, ((v: typeof actual) => boolean)?][],
+    ) => {
+      y = ensureSpace(doc, y, 16 + filas.length * 6);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(TEXT_PRIMARY);
+      doc.text(titulo.toUpperCase(), MARGIN, y);
+      y += 4;
+      autoTable(doc, {
+        startY: y,
+        margin: { left: MARGIN, right: MARGIN, bottom: FOOTER_RESERVE },
+        theme: 'grid',
+        styles: { font: 'helvetica', fontSize: 8.5, cellPadding: 2.2, textColor: TEXT_SECONDARY, lineColor: BORDER, lineWidth: 0.2 },
+        headStyles: { fillColor: RED, textColor: '#ffffff', fontStyle: 'bold', fontSize: 8.5 },
+        columnStyles: {
+          0: { cellWidth: CONTENT_W * 0.34, fontStyle: 'bold', textColor: TEXT_PRIMARY },
+          1: { cellWidth: CONTENT_W * 0.165, halign: 'right' },
+          2: { cellWidth: CONTENT_W * 0.165, halign: 'right' },
+          3: { cellWidth: CONTENT_W * 0.165, halign: 'right' },
+          4: { cellWidth: CONTENT_W * 0.165, halign: 'right' },
+        },
+        head: [['Concepto', 'Actual', 'Cumple', 'Parcial', 'Incumple']],
+        body: filas.map(([label, fmt]) => [label, ...vistas4.map((v) => (v ? fmt(v) : '—'))]),
+        didParseCell: (data) => {
+          if (data.section !== 'body' || data.column.index === 0) return;
+          const v = vistas4[data.column.index - 1];
+          const alerta = filas[data.row.index]?.[2];
+          if (v && alerta && alerta(v)) data.cell.styles.textColor = RED_700;
+        },
+      });
+      y = nextY();
+    };
+
+    // ---- Ciclo de conversión de efectivo ----------------------------------
+    tablaVistas('Ciclo de conversión de efectivo', [
+      ['Ciclo de conversión (días)', (v) => `${v.indicadores.ciclo_conversion_efectivo}`, (v) => v.indicadores.ciclo_conversion_efectivo > actual.indicadores.ciclo_conversion_efectivo],
+      ['Capital de trabajo neto', (v) => formatPesos(v.indicadores.capital_trabajo_neto)],
+      ['Días de cobro', (v) => `${v.indicadores.dias_cobro}`],
+      ['Días de inventario', (v) => `${v.indicadores.dias_inventario}`],
+      ['Días de pago', (v) => `${v.indicadores.dias_pago}`],
+      ['Cuentas por cobrar', (v) => formatPesos(v.indicadores.cuentas_por_cobrar)],
+      ['Inventario', (v) => formatPesos(v.indicadores.inventario_valor)],
+      ['Cuentas por pagar', (v) => formatPesos(v.indicadores.cuentas_por_pagar)],
+    ]);
+
+    // ---- Estados financieros --------------------------------------------
+    tablaVistas('Estado de resultados', [
+      ['Ingresos', (v) => formatPesos(v.estado_resultados.ingresos)],
+      ['EBITDA', (v) => formatPesos(v.estado_resultados.ebitda), (v) => v.estado_resultados.ebitda < 0],
+      ['(−) Depreciación', (v) => formatPesos(-v.estado_resultados.depreciacion)],
+      ['(−) Multa', (v) => formatPesos(-v.estado_resultados.multa)],
+      ['(−) Intereses', (v) => formatPesos(-v.estado_resultados.intereses)],
+      ['Utilidad neta', (v) => formatPesos(v.estado_resultados.utilidad_neta), (v) => v.estado_resultados.utilidad_neta < 0],
+    ]);
+    tablaVistas('Balance general', [
+      ['Activo fijo', (v) => formatPesos(v.balance.activo_fijo)],
+      ['Circulante operativo', (v) => formatPesos(v.balance.otros_activos)],
+      ['Caja', (v) => formatPesos(v.balance.caja), (v) => v.balance.caja < 0],
+      ['Activo total', (v) => formatPesos(v.balance.activo_total)],
+      ['Deuda financiera', (v) => formatPesos(v.balance.deuda)],
+      ['Proveedores', (v) => formatPesos(v.balance.cuentas_por_pagar)],
+      ['Capital', (v) => formatPesos(v.balance.capital)],
+      ['Pasivo + Capital', (v) => formatPesos(v.balance.pasivo_capital_total)],
+    ]);
+
+    // ---- Costo del crédito ---------------------------------------------
+    const spreadAct = simulacionFinanciera.spread.actual;
+    y = ensureSpace(doc, y, 20);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(TEXT_PRIMARY);
+    doc.text('COSTO DEL CRÉDITO', MARGIN, y);
+    y += 5;
+    if (spreadAct.aplica && spreadAct.spread_pct != null && spreadAct.tasa_total_pct != null) {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.setTextColor(TEXT_PRIMARY);
+      doc.text(`TIIE + ${spreadAct.spread_pct.toFixed(2)}%  (= ${spreadAct.tasa_total_pct.toFixed(2)}%)`, MARGIN, y);
+      y += 5;
+    }
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(TEXT_SECONDARY);
+    const spreadLineas = doc.splitTextToSize(spreadAct.nota, CONTENT_W) as string[];
+    y = ensureSpace(doc, y, spreadLineas.length * 4 + 6);
+    doc.text(spreadLineas, MARGIN, y);
+    y += spreadLineas.length * 4 + 8;
+
+    // ---- Decisión de crédito -----------------------------------------
+    const plazoBase = simulacionFinanciera.perfil_usado.amortizacion_anios;
+    const dict = dictamenBancabilidad(simulacionFinanciera.estructura_deuda.actual, plazoBase);
+    y = ensureSpace(doc, y, 22);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(TEXT_PRIMARY);
+    doc.text('DECISIÓN DE CRÉDITO · BANCABILIDAD ACTUAL', MARGIN, y);
+    y += 5;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9.5);
+    doc.setTextColor(dict.verdicto === 'Bancable' ? GREEN : dict.verdicto === 'Bancable con reestructura' ? AMBER : RED_700);
+    doc.text(`${dict.verdicto}:`, MARGIN, y);
+    y += 4.5;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(TEXT_SECONDARY);
+    const dictLineas = doc.splitTextToSize(dict.razon, CONTENT_W) as string[];
+    y = ensureSpace(doc, y, dictLineas.length * 4 + 6);
+    doc.text(dictLineas, MARGIN, y);
+    y += dictLineas.length * 4 + 8;
   }
 
   // ---- Detalle por norma (caja de cristal) -------------------------------
